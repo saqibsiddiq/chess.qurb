@@ -1,0 +1,15 @@
+{
+  "source_files": [
+    "/home/saqib/Projects/chesy/data/raw/worker_001.jsonl",
+    "/home/saqib/Projects/chesy/data/raw/worker_002.jsonl",
+    "/home/saqib/Projects/chesy/data/raw/worker_003.jsonl",
+    "/home/saqib/Projects/chesy/data/raw/worker_004.jsonl"
+  ],
+  "source_game_ids": 49928,
+  "duplicate_game_ids_removed": 1,
+  "conflicting_game_ids": 71,
+  "unique_games_written": 49928,
+  "rows_written": 3357109,
+  "duplicate_rows_removed": 4739,
+  "keep_rule": "first occurrence by worker name"
+}

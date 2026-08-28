@@ -1,0 +1,20 @@
+{
+  "hMBF4omN": {
+    "game_id": "hMBF4omN",
+    "occurrences": [
+      {
+        "worker": "worker_002",
+        "path": "/home/saqib/Projects/chesy/data/raw/worker_002.jsonl",
+        "rows": 44,
+        "sha256": "b75e05c89112f231be8f161b06de484975747427e55ad54d980ab8c14d59c1d5"
+      },
+      {
+        "worker": "worker_003",
+        "path": "/home/saqib/Projects/chesy/data/raw/worker_003.jsonl",
+        "rows": 44,
+        "sha256": "b75e05c89112f231be8f161b06de484975747427e55ad54d980ab8c14d59c1d5"
+      }
+    ],
+    "identical": true
+  }
+}

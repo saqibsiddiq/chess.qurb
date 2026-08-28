@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "input": "/home/saqib/Projects/chesy/data/clean/corpus_unique.jsonl",
+  "seed": 42,
+  "split_rule": "game-level sha256: 90% train, 5% validation, 5% test",
+  "normal_keep_probability": 0.2,
+  "games_seen": 49928,
+  "unique_games": 49928,
+  "stats": {
+    "rows_filtered_out": 1882716,
+    "rows_test": 74723,
+    "class_excellent": 121591,
+    "motif_none": 1164720,
+    "class_best": 242342,
+    "class_good": 121517,
+    "class_inaccuracy": 407027,
+    "motif_hanging_piece": 119788,
+    "class_mistake": 285312,
+    "motif_pin": 58485,
+    "class_blunder": 296604,
+    "motif_allowed_mate": 38117,
+    "motif_missed_mate": 19827,
+    "motif_fork": 44052,
+    "motif_mate": 12409,
+    "rows_train": 1326352,
+    "motif_discovered_attack": 15852,
+    "motif_skewer": 810,
+    "rows_validation": 73318,
+    "motif_back_rank": 333
+  },
+  "outputs": {
+    "train": "/home/saqib/Projects/chesy/data/phase6/train.jsonl",
+    "validation": "/home/saqib/Projects/chesy/data/phase6/validation.jsonl",
+    "test": "/home/saqib/Projects/chesy/data/phase6/test.jsonl",
+    "teacher_queue": "/home/saqib/Projects/chesy/data/phase6/teacher_queue.jsonl"
+  },
+  "note": "baseline_explanation is retained for comparison; teacher_queue targets are generated separately."
+}

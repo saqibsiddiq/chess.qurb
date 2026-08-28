@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "seed": 42,
+  "input": "/home/saqib/Projects/chesy/data/phase6/train.jsonl",
+  "output": "/home/saqib/Projects/chesy/data/phase6/teacher_pilot_10k.jsonl",
+  "input_rows_scanned": 1326352,
+  "invalid_rows": 0,
+  "requested_quotas": {
+    "rare_edge": 1000,
+    "blunder": 2500,
+    "mistake": 2000,
+    "inaccuracy": 1500,
+    "other_motif": 1000,
+    "good_excellent": 1000,
+    "best": 1000
+  },
+  "available_by_bucket": {
+    "best": 205529,
+    "good_excellent": 218645,
+    "inaccuracy": 363487,
+    "mistake": 255756,
+    "blunder": 218462,
+    "rare_edge": 64473
+  },
+  "selected_by_bucket": {
+    "rare_edge": 1000,
+    "blunder": 2500,
+    "mistake": 2000,
+    "inaccuracy": 1500,
+    "other_motif": 0,
+    "good_excellent": 1000,
+    "best": 1000
+  },
+  "selected_total": 9000,
+  "rare_edge_motifs": [
+    "allowed_mate",
+    "back_rank",
+    "mate",
+    "missed_mate",
+    "skewer"
+  ],
+  "selection_rule": "reservoir sampling from train.jsonl only; rare_edge has priority"
+}

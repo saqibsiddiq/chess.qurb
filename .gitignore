@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Vite
+dist/
+
+# Tauri / Rust
+target/
+app/src-tauri/target/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Large generated/source datasets
+data/raw/source/
+data/raw/*.jsonl
+data/clean/*.jsonl
+data/phase6/*.jsonl
+data/phase6a_pipeline/*.jsonl
+
+# Large generated reports/artifacts
+*.pgn
+*.pgn.zst
+*.jsonl
+
+# Local generated artifacts
+reports/generated/
+data/experiments/generated/
+
+# Local Python environments
+dataset/venv/

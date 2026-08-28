@@ -1,0 +1,352 @@
+{
+  "version": 2,
+  "files_found": 4,
+  "files": [
+    {
+      "worker": "worker_001",
+      "path": "/home/saqib/Projects/chesy/data/raw/worker_001.jsonl",
+      "bytes": 387483502,
+      "rows": 839126,
+      "unique_games": 12500,
+      "invalid_json": 0,
+      "missing_required_fields": 0,
+      "bad_field_types": 0,
+      "unknown_classifications": 0,
+      "classification_mismatches": 0,
+      "negative_loss": 0,
+      "nonfinite_loss": 0,
+      "negative_move_numbers": 0,
+      "invalid_colors": 0,
+      "blank_explanations": 0,
+      "bad_motif_detail": 0,
+      "duplicate_rows": 0,
+      "duplicate_game_ids_within_file": 0,
+      "classifications": {
+        "best": 287807,
+        "blunder": 74373,
+        "excellent": 151530,
+        "good": 152503,
+        "inaccuracy": 101516,
+        "mistake": 71397
+      },
+      "motifs": {
+        "allowed_mate": 9793,
+        "back_rank": 84,
+        "discovered_attack": 3946,
+        "fork": 10995,
+        "hanging_piece": 30128,
+        "mate": 3166,
+        "missed_mate": 5150,
+        "none": 761008,
+        "pin": 14633,
+        "skewer": 223
+      },
+      "row_counts_by_game": {
+        "min": 1,
+        "max": 362,
+        "mean": 67.13,
+        "games_with_1_to_4_rows": 43,
+        "games_with_over_200_rows": 15,
+        "games_with_over_300_rows": 2
+      },
+      "first_move_by_game": {},
+      "last_move_by_game": {}
+    },
+    {
+      "worker": "worker_002",
+      "path": "/home/saqib/Projects/chesy/data/raw/worker_002.jsonl",
+      "bytes": 387299859,
+      "rows": 838490,
+      "unique_games": 12500,
+      "invalid_json": 0,
+      "missing_required_fields": 0,
+      "bad_field_types": 0,
+      "unknown_classifications": 0,
+      "classification_mismatches": 0,
+      "negative_loss": 0,
+      "nonfinite_loss": 0,
+      "negative_move_numbers": 0,
+      "invalid_colors": 0,
+      "blank_explanations": 0,
+      "bad_motif_detail": 0,
+      "duplicate_rows": 0,
+      "duplicate_game_ids_within_file": 0,
+      "classifications": {
+        "best": 287221,
+        "blunder": 74311,
+        "excellent": 152262,
+        "good": 151722,
+        "inaccuracy": 101670,
+        "mistake": 71304
+      },
+      "motifs": {
+        "allowed_mate": 9708,
+        "back_rank": 89,
+        "discovered_attack": 4032,
+        "fork": 11011,
+        "hanging_piece": 29887,
+        "mate": 3090,
+        "missed_mate": 5050,
+        "none": 760856,
+        "pin": 14577,
+        "skewer": 190
+      },
+      "row_counts_by_game": {
+        "min": 1,
+        "max": 276,
+        "mean": 67.079,
+        "games_with_1_to_4_rows": 59,
+        "games_with_over_200_rows": 11,
+        "games_with_over_300_rows": 0
+      },
+      "first_move_by_game": {},
+      "last_move_by_game": {}
+    },
+    {
+      "worker": "worker_003",
+      "path": "/home/saqib/Projects/chesy/data/raw/worker_003.jsonl",
+      "bytes": 387453044,
+      "rows": 838739,
+      "unique_games": 12500,
+      "invalid_json": 0,
+      "missing_required_fields": 0,
+      "bad_field_types": 0,
+      "unknown_classifications": 0,
+      "classification_mismatches": 0,
+      "negative_loss": 0,
+      "nonfinite_loss": 0,
+      "negative_move_numbers": 0,
+      "invalid_colors": 0,
+      "blank_explanations": 0,
+      "bad_motif_detail": 0,
+      "duplicate_rows": 0,
+      "duplicate_game_ids_within_file": 0,
+      "classifications": {
+        "best": 287225,
+        "blunder": 74107,
+        "excellent": 151817,
+        "good": 151873,
+        "inaccuracy": 102033,
+        "mistake": 71684
+      },
+      "motifs": {
+        "allowed_mate": 9353,
+        "back_rank": 81,
+        "discovered_attack": 3951,
+        "fork": 11076,
+        "hanging_piece": 29924,
+        "mate": 3106,
+        "missed_mate": 4811,
+        "none": 761445,
+        "pin": 14777,
+        "skewer": 215
+      },
+      "row_counts_by_game": {
+        "min": 1,
+        "max": 256,
+        "mean": 67.099,
+        "games_with_1_to_4_rows": 85,
+        "games_with_over_200_rows": 16,
+        "games_with_over_300_rows": 0
+      },
+      "first_move_by_game": {},
+      "last_move_by_game": {}
+    },
+    {
+      "worker": "worker_004",
+      "path": "/home/saqib/Projects/chesy/data/raw/worker_004.jsonl",
+      "bytes": 390383300,
+      "rows": 845493,
+      "unique_games": 12500,
+      "invalid_json": 0,
+      "missing_required_fields": 0,
+      "bad_field_types": 0,
+      "unknown_classifications": 0,
+      "classification_mismatches": 0,
+      "negative_loss": 0,
+      "nonfinite_loss": 0,
+      "negative_move_numbers": 0,
+      "invalid_colors": 0,
+      "blank_explanations": 0,
+      "bad_motif_detail": 0,
+      "duplicate_rows": 0,
+      "duplicate_game_ids_within_file": 0,
+      "classifications": {
+        "best": 290488,
+        "blunder": 74258,
+        "excellent": 153580,
+        "good": 153488,
+        "inaccuracy": 102366,
+        "mistake": 71313
+      },
+      "motifs": {
+        "allowed_mate": 9319,
+        "back_rank": 79,
+        "discovered_attack": 3950,
+        "fork": 11031,
+        "hanging_piece": 30015,
+        "mate": 3065,
+        "missed_mate": 4847,
+        "none": 768429,
+        "pin": 14575,
+        "skewer": 183
+      },
+      "row_counts_by_game": {
+        "min": 1,
+        "max": 311,
+        "mean": 67.639,
+        "games_with_1_to_4_rows": 48,
+        "games_with_over_200_rows": 14,
+        "games_with_over_300_rows": 1
+      },
+      "first_move_by_game": {},
+      "last_move_by_game": {}
+    }
+  ],
+  "rows": 3361848,
+  "game_count_sum": 50000,
+  "unique_games_across_all_workers": 49928,
+  "cross_worker_duplicate_game_ids": 72,
+  "invalid_json": 0,
+  "missing_required_fields": 0,
+  "bad_field_types": 0,
+  "unknown_classifications": 0,
+  "classification_mismatches": 0,
+  "negative_loss": 0,
+  "nonfinite_loss": 0,
+  "negative_move_numbers": 0,
+  "invalid_colors": 0,
+  "blank_explanations": 0,
+  "bad_motif_detail": 0,
+  "duplicate_rows": 0,
+  "cross_worker_duplicate_examples": [
+    {
+      "game_id": "BOp7PToa",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "KDJcg18V",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "PcC9KvcH",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "WmusS8YY",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "eIIuUFJN",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "0MQWgGIL",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "xl045ekC",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "Y1D6LgZj",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "f9nqzyNx",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "D0PN1KJh",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "wpQ93meu",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "jYnQ3CSu",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "gKDVzdPu",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "opK7z16L",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "vEDgtnZe",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "j7kGzJAX",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "sEjx0xHI",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "bDS3MNt9",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "W0bwgR96",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    },
+    {
+      "game_id": "6THgynVf",
+      "first_worker": "worker_001",
+      "second_worker": "worker_002"
+    }
+  ],
+  "examples": {
+    "invalid_json": [],
+    "missing_fields": [],
+    "bad_types": [],
+    "classification_mismatches": [],
+    "duplicate_rows": [],
+    "move_order_regressions": []
+  },
+  "classifications": {
+    "best": 1152741,
+    "blunder": 297049,
+    "excellent": 609189,
+    "good": 609586,
+    "inaccuracy": 407585,
+    "mistake": 285698
+  },
+  "motifs": {
+    "allowed_mate": 38173,
+    "back_rank": 333,
+    "discovered_attack": 15879,
+    "fork": 44113,
+    "hanging_piece": 119954,
+    "mate": 12427,
+    "missed_mate": 19858,
+    "none": 3051738,
+    "pin": 58562,
+    "skewer": 811
+  }
+}
