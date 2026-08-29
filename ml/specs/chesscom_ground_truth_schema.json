@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "chesy://schemas/chesscom-ground-truth/v1",
+  "title": "Chesy Chess.com Game Review Ground Truth",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "source",
+    "game",
+    "move",
+    "chesscom",
+    "chesy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "provider",
+        "artifact_path"
+      ],
+      "properties": {
+        "provider": {
+          "const": "chess.com"
+        },
+        "artifact_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "review_type": {
+          "const": "game_review"
+        },
+        "classification_version": {
+          "type": "string"
+        },
+        "engine_strength": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "game": {
+      "type": "object",
+      "required": [
+        "game_id"
+      ],
+      "properties": {
+        "game_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "white_username": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "black_username": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "white_elo": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "black_elo": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "move": {
+      "type": "object",
+      "required": [
+        "move_number",
+        "color",
+        "played_move_san"
+      ],
+      "properties": {
+        "move_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "color": {
+          "enum": [
+            "white",
+            "black"
+          ]
+        },
+        "fen_before": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "played_move_san": {
+          "type": "string",
+          "minLength": 1
+        },
+        "played_move_uci": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "chesscom": {
+      "type": "object",
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "label": {
+          "enum": [
+            "Brilliant",
+            "Great",
+            "Best",
+            "Excellent",
+            "Good",
+            "Book",
+            "Inaccuracy",
+            "Mistake",
+            "Miss",
+            "Blunder"
+          ]
+        },
+        "best_move_san": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "best_move_uci": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evaluation_before": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "evaluation_after": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "raw_annotation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "chesy": {
+      "type": "object",
+      "properties": {
+        "dataset_classification": {
+          "enum": [
+            "best",
+            "excellent",
+            "good",
+            "inaccuracy",
+            "mistake",
+            "blunder",
+            null
+          ]
+        },
+        "live_classification": {
+          "enum": [
+            "best",
+            "excellent",
+            "good",
+            "inaccuracy",
+            "mistake",
+            "blunder",
+            null
+          ]
+        },
+        "comparison_label": {
+          "enum": [
+            "best",
+            "excellent",
+            "good",
+            "inaccuracy",
+            "mistake",
+            "blunder",
+            null
+          ]
+        },
+        "mapping_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
