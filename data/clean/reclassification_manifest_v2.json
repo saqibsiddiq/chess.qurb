@@ -1,0 +1,43 @@
+{
+  "input": "/home/saqib/Projects/chesy/data/clean/corpus_unique.jsonl",
+  "output": "/home/saqib/Projects/chesy/data/clean/corpus_unique_v2.jsonl",
+  "rows_processed": 3357109,
+  "rows_changed_classification": 1652885,
+  "classification_counts_before": {
+    "best": 1151071,
+    "excellent": 608361,
+    "good": 608734,
+    "inaccuracy": 407027,
+    "mistake": 285312,
+    "blunder": 296604
+  },
+  "classification_counts_after": {
+    "book": 292527,
+    "excellent": 1086271,
+    "best": 1006580,
+    "good": 408202,
+    "miss": 56685,
+    "mistake": 122005,
+    "inaccuracy": 246113,
+    "blunder": 138726
+  },
+  "transitions": {
+    "best->best": 1006580,
+    "good->excellent": 555483,
+    "excellent->excellent": 530788,
+    "inaccuracy->good": 389504,
+    "mistake->inaccuracy": 246113,
+    "best->book": 144180,
+    "blunder->blunder": 138726,
+    "blunder->mistake": 93875,
+    "excellent->book": 77573,
+    "good->book": 53251,
+    "blunder->miss": 52392,
+    "mistake->mistake": 28130,
+    "inaccuracy->book": 17523,
+    "blunder->good": 11611,
+    "mistake->good": 7087,
+    "mistake->miss": 3982,
+    "best->miss": 311
+  }
+}

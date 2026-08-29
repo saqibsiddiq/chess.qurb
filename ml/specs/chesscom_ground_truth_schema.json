@@ -203,22 +203,30 @@
         },
         "live_classification": {
           "enum": [
+            "brilliant",
+            "great",
             "best",
             "excellent",
             "good",
+            "book",
             "inaccuracy",
             "mistake",
+            "miss",
             "blunder",
             null
           ]
         },
         "comparison_label": {
           "enum": [
+            "brilliant",
+            "great",
             "best",
             "excellent",
             "good",
+            "book",
             "inaccuracy",
             "mistake",
+            "miss",
             "blunder",
             null
           ]

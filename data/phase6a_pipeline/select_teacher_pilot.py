@@ -10,10 +10,11 @@ QUOTAS = {
     "rare_edge": 1000,
     "blunder": 2500,
     "mistake": 2000,
+    "miss": 1000,
     "inaccuracy": 1500,
     "other_motif": 1000,
-    "good_excellent": 1000,
-    "best": 1000,
+    "good_excellent": 500,
+    "best": 500,
 }
 RARE_MOTIFS = {"back_rank", "skewer", "mate", "missed_mate", "allowed_mate"}
 ORDER = tuple(QUOTAS)
@@ -24,6 +25,13 @@ def bucket(rec):
     motif, cls = x["motif"], x["classification"]
     if motif in RARE_MOTIFS:
         return "rare_edge"
+    if cls == "miss":
+        # Missed a forced mate/fork/pin/skewer — specifically the category
+        # this pilot most needs good explanations for, so it gets its own
+        # bucket even though its motif may already be a RARE_MOTIFS value
+        # (missed_mate/skewer) — those get caught above, everything else
+        # (fork/pin) lands here instead of the generic other_motif bucket.
+        return "miss"
     if cls == "blunder":
         return "blunder"
     if cls == "mistake":
@@ -32,7 +40,7 @@ def bucket(rec):
         return "inaccuracy"
     if motif != "none":
         return "other_motif"
-    if cls in {"good", "excellent"}:
+    if cls in {"good", "excellent", "book"}:
         return "good_excellent"
     if cls == "best":
         return "best"

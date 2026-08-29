@@ -11,8 +11,11 @@ interface MoveListProps {
 }
 
 const SYMBOLS: Partial<Record<Classification, string>> = {
+  brilliant: '!!',
+  great: '!',
   best: '★',
   inaccuracy: '?!',
+  miss: '⚑',
   mistake: '?',
   blunder: '??',
 };

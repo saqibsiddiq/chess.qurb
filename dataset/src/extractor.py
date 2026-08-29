@@ -32,11 +32,11 @@ try:
 except ImportError:
     zstandard = None
 
+import classify
 from motifs import detect_motif
 from templates import build_explanation
 
 
-MATE_SENTINEL = 100_000
 NEEDS_ENGINE = {"inaccuracy", "mistake", "blunder"}
 
 EVAL_RE = re.compile(
@@ -141,6 +141,9 @@ def print_progress(
     max_games: int,
     started_at: float,
     rows_written: int,
+    raw_games_seen: int = 0,
+    games_skipped_rating: int = 0,
+    games_skipped_malformed: int = 0,
 ) -> None:
     elapsed = time.monotonic() - started_at
 
@@ -172,7 +175,10 @@ def print_progress(
         f"({percent:.2f}%) | "
         f"{speed:.3f} games/s | "
         f"ETA: {format_duration(eta)} | "
-        f"rows: {rows_written}",
+        f"rows: {rows_written} | "
+        f"seen: {raw_games_seen} | "
+        f"skipped(rating): {games_skipped_rating} | "
+        f"skipped(malformed): {games_skipped_malformed}",
         flush=True,
     )
 
@@ -198,44 +204,6 @@ def parse_eval_comment(
         return None, int(raw[1:])
 
     return round(float(raw) * 100), None
-
-
-def to_cp_value(
-    cp: int | None,
-    mate: int | None,
-) -> float:
-    if mate is not None:
-        if mate > 0:
-            return MATE_SENTINEL - mate * 10
-        return -MATE_SENTINEL - mate * 10
-
-    return float(cp) if cp is not None else 0.0
-
-
-def classify(
-    loss_cp: float,
-    played_uci: str,
-    best_uci: str | None,
-) -> str:
-    if best_uci is not None and played_uci == best_uci:
-        return "best"
-
-    if loss_cp < 5:
-        return "best"
-
-    if loss_cp < 20:
-        return "excellent"
-
-    if loss_cp < 50:
-        return "good"
-
-    if loss_cp < 100:
-        return "inaccuracy"
-
-    if loss_cp < 200:
-        return "mistake"
-
-    return "blunder"
 
 
 # ---------------------------------------------------------------------
@@ -382,12 +350,12 @@ def process_game(
         # Evaluation loss
         # -------------------------------------------------------------
 
-        cp_before = to_cp_value(
+        cp_before = classify.to_cp_value(
             eval_before_cp,
             eval_before_mate,
         )
 
-        cp_after = to_cp_value(
+        cp_after = classify.to_cp_value(
             eval_after_cp,
             eval_after_mate,
         )
@@ -403,10 +371,36 @@ def process_game(
             float(raw_delta),
         )
 
-        # Initial classification before best-move search.
-        classification = classify(
+        is_checkmate = board.is_checkmate()
+
+        # Win% is always from the mover's perspective; cp values above are
+        # White-relative.
+        wp_before = (
+            classify.win_percent(cp_before)
+            if is_white
+            else 100 - classify.win_percent(cp_before)
+        )
+        wp_after = (
+            classify.win_percent(cp_after)
+            if is_white
+            else 100 - classify.win_percent(cp_after)
+        )
+
+        is_opening_theory_candidate = classify.is_opening_theory_candidate(
+            fen_before,
+            played_uci,
+        )
+
+        # Initial classification before best-move search — decides
+        # whether engine analysis is needed at all.
+        classification = classify.classify(
             loss_cp,
             played_uci,
+            None,
+            wp_before,
+            wp_after,
+            is_checkmate,
+            is_opening_theory_candidate,
             None,
         )
 
@@ -446,15 +440,20 @@ def process_game(
 
                 best_uci = best_move.uci()
 
-            # Reclassify using the actual best move.
-            classification = classify(
+            # Reclassify using the actual best move (motif not known yet,
+            # this is only used to gate/inform the motif detector below —
+            # same two-stage pattern the original extractor used).
+            pre_motif_classification = classify.classify(
                 loss_cp,
                 played_uci,
                 best_uci,
+                wp_before,
+                wp_after,
+                is_checkmate,
+                is_opening_theory_candidate,
+                None,
             )
 
-            # IMPORTANT:
-            # Motif detector gets BOTH classification and best move.
             result = detect_motif(
                 board_before=board_before,
                 board_after=board,
@@ -463,18 +462,36 @@ def process_game(
                 eval_before_mate=eval_before_mate,
                 eval_after_mate=eval_after_mate,
                 best_move_uci=best_uci,
-                classification=classification,
+                classification=pre_motif_classification,
             )
 
             motif = result.motif
             motif_detail = result.detail
 
+            missed_tactic_motif = (
+                motif
+                if motif in ("missed_mate", "fork", "pin", "skewer")
+                else None
+            )
+
+            # Final classification, now that motif is known — may upgrade
+            # a mistake/blunder to "miss".
+            classification = classify.classify(
+                loss_cp,
+                played_uci,
+                best_uci,
+                wp_before,
+                wp_after,
+                is_checkmate,
+                is_opening_theory_candidate,
+                missed_tactic_motif,
+            )
+
         # -------------------------------------------------------------
         # Actual checkmate
         # -------------------------------------------------------------
 
-        if board.is_checkmate():
-            classification = "best"
+        if is_checkmate:
             motif = "mate"
             motif_detail = {}
 

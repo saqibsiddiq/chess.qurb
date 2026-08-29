@@ -11,6 +11,13 @@ pub struct AnalysisResult {
     pub eval_mate: Option<i32>,
     pub pv: Vec<String>,
     pub depth: u32,
+    // Second-best line from a MultiPV=2 search (analyze_game() only). Used
+    // to detect "only good move" (Great) / sacrifice (Brilliant) situations
+    // client-side. Left None by analyze_position()/check_engine(), which
+    // never enable MultiPV.
+    pub second_move: Option<String>,
+    pub second_eval_cp: Option<i32>,
+    pub second_eval_mate: Option<i32>,
 }
 
 #[derive(Serialize, Clone)]
@@ -84,6 +91,14 @@ impl EngineSession {
         writeln!(self.stdin, "{cmd}").map_err(|e| e.to_string())
     }
 
+    /// Enables (or disables, with value 1) MultiPV. Used by analyze_game()
+    /// so classification can compare the best line against the runner-up.
+    fn set_multipv(&mut self, value: u32) -> Result<(), String> {
+        self.send(&format!("setoption name MultiPV value {value}"))?;
+        self.send("isready")?;
+        self.wait_for("readyok")
+    }
+
     fn wait_for_uci_ok(&mut self) -> Result<Option<String>, String> {
         let mut line = String::new();
         let mut engine_name = None;
@@ -123,7 +138,13 @@ impl EngineSession {
         self.send(&format!("position fen {fen}"))?;
         self.send(&format!("go depth {depth}"))?;
 
-        let mut last_info: Option<String> = None;
+        // With MultiPV>1, Stockfish prints one "info ... multipv N ..." line
+        // per line per depth. A single `last_info` slot would get silently
+        // overwritten by whichever multipv index happens to arrive last —
+        // routing by the `multipv` token keeps the best (multipv 1) and
+        // runner-up (multipv 2) lines separate.
+        let mut last_info_pv1: Option<String> = None;
+        let mut last_info_pv2: Option<String> = None;
         let mut best_move = String::new();
         let mut line = String::new();
 
@@ -139,7 +160,11 @@ impl EngineSession {
                     || trimmed.contains(" score mate ")
                     || trimmed.contains(" pv "))
             {
-                last_info = Some(trimmed.to_string());
+                let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+                match multipv_index(&tokens) {
+                    2 => last_info_pv2 = Some(trimmed.to_string()),
+                    _ => last_info_pv1 = Some(trimmed.to_string()),
+                }
             } else if trimmed.starts_with("bestmove") {
                 let raw_best = trimmed.split_whitespace().nth(1).unwrap_or("").to_string();
                 if raw_best != "(none)" {
@@ -149,7 +174,7 @@ impl EngineSession {
             }
         }
 
-        let mut result = last_info
+        let mut result = last_info_pv1
             .map(|info| parse_info_line(&info, best_move.clone(), depth))
             .unwrap_or(AnalysisResult {
                 best_move,
@@ -157,12 +182,24 @@ impl EngineSession {
                 eval_mate: None,
                 pv: Vec::new(),
                 depth,
+                second_move: None,
+                second_eval_cp: None,
+                second_eval_mate: None,
             });
+
+        if let Some(info2) = last_info_pv2 {
+            let parsed2 = parse_info_line(&info2, String::new(), depth);
+            result.second_move = parsed2.pv.first().cloned();
+            result.second_eval_cp = parsed2.eval_cp;
+            result.second_eval_mate = parsed2.eval_mate;
+        }
 
         // Normalize to "positive = good for White".
         if fen.split_whitespace().nth(1) == Some("b") {
             result.eval_cp = result.eval_cp.map(|v| -v);
             result.eval_mate = result.eval_mate.map(|v| -v);
+            result.second_eval_cp = result.second_eval_cp.map(|v| -v);
+            result.second_eval_mate = result.second_eval_mate.map(|v| -v);
         }
 
         Ok(result)
@@ -174,6 +211,19 @@ impl Drop for EngineSession {
         let _ = self.send("quit");
         let _ = self.child.wait();
     }
+}
+
+/// Reads the `multipv N` token from an already-tokenized UCI `info` line.
+/// Defaults to 1 when absent (some engines/modes omit it for single-PV output).
+fn multipv_index(tokens: &[&str]) -> u32 {
+    let mut i = 0;
+    while i < tokens.len() {
+        if tokens[i] == "multipv" {
+            return tokens.get(i + 1).and_then(|v| v.parse().ok()).unwrap_or(1);
+        }
+        i += 1;
+    }
+    1
 }
 
 fn parse_info_line(line: &str, best_move: String, depth: u32) -> AnalysisResult {
@@ -207,6 +257,9 @@ fn parse_info_line(line: &str, best_move: String, depth: u32) -> AnalysisResult 
         eval_mate,
         pv,
         depth,
+        second_move: None,
+        second_eval_cp: None,
+        second_eval_mate: None,
     }
 }
 
@@ -245,6 +298,11 @@ fn analyze_game(
     engine_path: Option<String>,
 ) -> Result<Vec<AnalysisResult>, String> {
     let mut session = EngineSession::start_with_path(engine_path.as_deref())?;
+    // Always analyze full-game reviews with MultiPV=2: classification needs
+    // the runner-up line to detect Great/Brilliant, and this is local,
+    // unlimited-use software where the ~2x engine time is an acceptable
+    // trade for classification accuracy.
+    session.set_multipv(2)?;
     let total = fens.len();
     let mut results = Vec::with_capacity(total);
 

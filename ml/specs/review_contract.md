@@ -42,16 +42,37 @@ When Chess.com Game Review is used as external ground truth:
 
 ## 3. Chesy classification
 
-Chesy currently exposes six primary classifications:
+The live application (`app/src/lib/reviewEngine.ts`) exposes Chess.com's
+full ten-class scheme:
 
+- brilliant
+- great
 - best
 - excellent
 - good
+- book
 - inaccuracy
 - mistake
+- miss
 - blunder
 
-These are the internal labels used by the current dataset and application.
+`brilliant`, `great`, `book`, and `miss` are Chesy approximations of
+Chess.com's proprietary logic, per section 9 below — not claimed replicas.
+
+The dataset pipeline (`dataset/src/extractor.py`) now produces 8 of the
+10 classes — the six severity classes plus `book` and `miss` — via
+`dataset/src/classify.py`, the single canonical Python reimplementation
+of `reviewEngine.ts`'s formula (previously, the dataset and the audit
+tooling each maintained their own independent copy of this formula,
+which is how they drifted apart in the first place).
+
+`great` and `brilliant` are still absent from the dataset: they need a
+second engine line (MultiPV) that the extractor only computes for a
+minority of rows, so producing them would require a substantially larger
+Stockfish re-run. This is tracked, intentional future work, not an
+oversight. See `ml/specs/classification_policy.md` for the full
+per-class status table (canonical / approximation / deferred) and the
+specific limitations of the dataset-side `book` and `miss` heuristics.
 
 ## 4. Comparison labels
 

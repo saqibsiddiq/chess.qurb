@@ -84,14 +84,32 @@ def build_explanation(
             body = f"You played {played_san}, dropping about {pawns} pawns, missing a fork on {targets}."
 
     elif motif == "pin":
+        # detail describes what the ENGINE's move would have pinned (an
+        # opponent piece), not something that happened to the mover's own
+        # piece — this is a missed opportunity, same framing as "fork"
+        # above and app/src/lib/explanations.ts's "Missed pin".
         piece = detail.get("piece", "piece")
         target = detail.get("target", "the piece behind it")
-        body = f"{played_san} left your {piece} pinned to {target}."
+        if best_move_san:
+            body = (
+                f"The engine's move {best_move_san} would have pinned the {piece} to the {target}; "
+                f"{played_san} let it move freely instead."
+            )
+        else:
+            body = f"{played_san} missed a pin on the {piece}, which stays free to move."
 
     elif motif == "skewer":
+        # Same framing note as "pin" above: this describes the engine's
+        # missed move, not a threat against the mover.
         front = detail.get("front", "king")
         behind = detail.get("behind", "a valuable piece")
-        body = f"{played_san} allowed a skewer: the {front} is attacked first, exposing {behind}."
+        if best_move_san:
+            body = (
+                f"The engine's move {best_move_san} would have skewered the {front}, winning the {behind} "
+                f"behind it; {played_san} left both pieces safe."
+            )
+        else:
+            body = f"{played_san} missed a skewer that would have won the {behind} behind the {front}."
 
     elif motif == "discovered_attack":
         target = detail.get("target", "a valuable piece")
@@ -99,6 +117,14 @@ def build_explanation(
 
     elif motif == "back_rank":
         body = f"{played_san} left the back rank vulnerable: the king has too little room to escape."
+
+    elif classification == "book":
+        bodies = [
+            f"{played_san} follows common opening play at this stage of the game.",
+            f"{played_san} matches how this position is often handled in practice.",
+            f"{played_san} keeps to well-trodden opening ground here.",
+        ]
+        body = bodies[variant % len(bodies)]
 
     elif classification in ("best", "excellent", "good"):
         if pawns <= 0:
