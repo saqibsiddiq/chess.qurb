@@ -1,7 +1,24 @@
 use serde::Serialize;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use tauri::Emitter;
+use tauri::{path::BaseDirectory, Emitter, Manager};
+
+/// Picks which Stockfish executable to launch. An explicit `engine_path`
+/// (e.g. a future settings UI) always wins. Otherwise, prefer the copy
+/// bundled into the app as a resource (see src-tauri/binaries/README.md)
+/// so a packaged build works without the user installing Stockfish
+/// separately — falling back to a bare `stockfish` lookup on $PATH when
+/// no bundled copy is present, which is what happens in `tauri dev`
+/// (resources are only laid out on disk by a real `tauri build`).
+fn resolve_engine_path(app: &tauri::AppHandle, engine_path: Option<String>) -> String {
+    if let Some(path) = engine_path {
+        return path;
+    }
+    match app.path().resolve("binaries/stockfish", BaseDirectory::Resource) {
+        Ok(resolved) if resolved.exists() => resolved.to_string_lossy().into_owned(),
+        _ => "stockfish".to_string(),
+    }
+}
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -264,8 +281,8 @@ fn parse_info_line(line: &str, best_move: String, depth: u32) -> AnalysisResult 
 }
 
 #[tauri::command]
-fn check_engine(engine_path: Option<String>) -> EngineInfo {
-    let path = engine_path.unwrap_or_else(|| "stockfish".to_string());
+fn check_engine(app: tauri::AppHandle, engine_path: Option<String>) -> EngineInfo {
+    let path = resolve_engine_path(&app, engine_path);
     match EngineSession::start_with_path(Some(&path)) {
         Ok(session) => EngineInfo {
             available: true,
@@ -283,8 +300,14 @@ fn check_engine(engine_path: Option<String>) -> EngineInfo {
 }
 
 #[tauri::command]
-fn analyze_position(fen: String, depth: u32, engine_path: Option<String>) -> Result<AnalysisResult, String> {
-    let mut session = EngineSession::start_with_path(engine_path.as_deref())?;
+fn analyze_position(
+    app: tauri::AppHandle,
+    fen: String,
+    depth: u32,
+    engine_path: Option<String>,
+) -> Result<AnalysisResult, String> {
+    let path = resolve_engine_path(&app, engine_path);
+    let mut session = EngineSession::start_with_path(Some(&path))?;
     session.analyze(&fen, depth)
 }
 
@@ -311,7 +334,8 @@ fn analyze_game(
     engine_path: Option<String>,
     multi_pv: Option<u32>,
 ) -> Result<(), String> {
-    let mut session = EngineSession::start_with_path(engine_path.as_deref())?;
+    let path = resolve_engine_path(&app, engine_path);
+    let mut session = EngineSession::start_with_path(Some(&path))?;
     // MultiPV=2 (the frontend's "Deep" mode) gives classification the
     // runner-up line needed to detect Great/Brilliant, at roughly 2x engine
     // time per position — an acceptable trade on desktop, but not
