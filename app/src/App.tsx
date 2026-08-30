@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import ChessBoard from './components/ChessBoard';
 import PgnImporter from './components/PgnImporter';
+import ConnectPanel from './components/ConnectPanel';
 import MoveList from './components/MoveList';
 import EnginePanel from './components/EnginePanel';
 import GameGraph from './components/GameGraph.tsx';
@@ -310,6 +311,7 @@ function App() {
             <span className="eyebrow">Your board, your pace</span>
             <h2>See the game<br /><em>one move at a time.</em></h2>
             <p>Import a PGN to revisit key moments, study the flow, and find the tactical and positional ideas that shaped the game.</p>
+            <ConnectPanel onImport={handleImport} />
           </div>
           <PgnImporter onImport={handleImport} />
         </section>
