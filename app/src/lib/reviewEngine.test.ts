@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { reviewGame } from './reviewEngine';
+import { EMPTY_ACCURACY_ACCUMULATOR, finalizeAccuracy, reviewGame, reviewMove } from './reviewEngine';
 import type { ParsedGame } from './parsePgn';
 import type { AnalysisResult } from './analysis';
 
@@ -220,5 +220,43 @@ describe('reviewGame severity ladder (no book/tactics involved)', () => {
       mkAnalysis({ bestMove: 'e8d8', evalCp: after }),
     ];
     expect(reviewGame(game, analysis).moves[0].classification).toBe(expected);
+  });
+});
+
+describe('reviewMove incremental classification matches a full reviewGame batch call', () => {
+  test('classifying one move at a time, in order, produces the same result as reviewGame', () => {
+    // A short quiet sequence with a mix of severities — walking a king
+    // back and forth on an empty board, so no book/tactic motifs get in
+    // the way of checking pure incremental-vs-batch equivalence.
+    const startingFen = '4k3/8/8/8/8/8/8/2Q1K3 w - - 0 1';
+    const game: ParsedGame = {
+      headers: {},
+      startingFen,
+      moves: [
+        { moveNumber: 1, color: 'w', san: 'Kd1', uci: 'e1d1', fenAfter: '4k3/8/8/8/8/8/8/2QK4 b - - 0 1' },
+        { moveNumber: 1, color: 'b', san: 'Kd8', uci: 'e8d8', fenAfter: '3k4/8/8/8/8/8/8/2QK4 w - - 1 2' },
+      ],
+    };
+
+    const analysis: AnalysisResult[] = [
+      mkAnalysis({ bestMove: 'c1c8', evalCp: 400 }),
+      mkAnalysis({ bestMove: 'd8e8', evalCp: 320 }),
+      mkAnalysis({ bestMove: 'd1c2', evalCp: 200 }),
+    ];
+
+    const batch = reviewGame(game, analysis);
+
+    let accumulator = EMPTY_ACCURACY_ACCUMULATOR;
+    const incrementalMoves = [];
+    for (let i = 0; i < game.moves.length; i++) {
+      const result = reviewMove(game, i, analysis[i], analysis[i + 1], accumulator);
+      incrementalMoves.push(result.reviewedMove);
+      accumulator = result.accumulator;
+    }
+    const incrementalAccuracy = finalizeAccuracy(accumulator);
+
+    expect(incrementalMoves.map((m) => m.classification)).toEqual(batch.moves.map((m) => m.classification));
+    expect(incrementalMoves.map((m) => m.lossCp)).toEqual(batch.moves.map((m) => m.lossCp));
+    expect(incrementalAccuracy).toEqual({ whiteAccuracy: batch.whiteAccuracy, blackAccuracy: batch.blackAccuracy });
   });
 });

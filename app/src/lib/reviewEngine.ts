@@ -146,112 +146,137 @@ function classify(input: ClassifyInput): Classification {
   return severity;
 }
 
-export function reviewGame(game: ParsedGame, analysis: AnalysisResult[]): GameReview {
-  const moves: ReviewedMove[] = [];
-  let whiteAccSum = 0;
-  let whiteAccCount = 0;
-  let blackAccSum = 0;
-  let blackAccCount = 0;
+export interface AccuracyAccumulator {
+  whiteSum: number;
+  whiteCount: number;
+  blackSum: number;
+  blackCount: number;
+}
 
-  for (let i = 0; i < game.moves.length; i++) {
-    const move = game.moves[i];
-    const before = analysis[i];
-    const after = analysis[i + 1];
-    const fenBefore = i === 0 ? game.startingFen : game.moves[i - 1].fenAfter;
+export const EMPTY_ACCURACY_ACCUMULATOR: AccuracyAccumulator = {
+  whiteSum: 0,
+  whiteCount: 0,
+  blackSum: 0,
+  blackCount: 0,
+};
 
-    let isCheckmate = false;
-    try {
-      isCheckmate = new Chess(move.fenAfter).isCheckmate();
-    } catch {
-      isCheckmate = false;
-    }
+export function finalizeAccuracy(acc: AccuracyAccumulator): { whiteAccuracy: number; blackAccuracy: number } {
+  return {
+    whiteAccuracy: acc.whiteCount ? acc.whiteSum / acc.whiteCount : 100,
+    blackAccuracy: acc.blackCount ? acc.blackSum / acc.blackCount : 100,
+  };
+}
 
-    const nextTurnIsWhite = move.color === 'b';
-    const cpBefore = toCpValue(before.evalCp, before.evalMate, move.color === 'w');
-    const cpAfter = isCheckmate
-      ? move.color === 'w'
-        ? MATE_SCORE
-        : -MATE_SCORE
-      : toCpValue(after.evalCp, after.evalMate, nextTurnIsWhite);
+/**
+ * Classifies a single move. Needs only the two adjacent AnalysisResult
+ * slots (before/after) plus the running accuracy accumulator — nothing
+ * else in the game depends on move order beyond that, which is what lets
+ * the frontend classify moves incrementally as engine analysis streams
+ * in, rather than waiting for the whole game.
+ */
+export function reviewMove(
+  game: ParsedGame,
+  index: number,
+  before: AnalysisResult,
+  after: AnalysisResult,
+  accumulator: AccuracyAccumulator,
+): { reviewedMove: ReviewedMove; accumulator: AccuracyAccumulator } {
+  const move = game.moves[index];
+  const i = index;
+  const fenBefore = i === 0 ? game.startingFen : game.moves[i - 1].fenAfter;
 
-    const rawDelta = move.color === 'w' ? cpBefore - cpAfter : cpAfter - cpBefore;
-    const lossCp = isCheckmate ? 0 : Math.max(0, rawDelta);
+  let isCheckmate = false;
+  try {
+    isCheckmate = new Chess(move.fenAfter).isCheckmate();
+  } catch {
+    isCheckmate = false;
+  }
 
-    const wpBefore = move.color === 'w' ? winPercent(cpBefore) : 100 - winPercent(cpBefore);
-    const wpAfter = isCheckmate
-      ? 100
-      : move.color === 'w'
-        ? winPercent(cpAfter)
-        : 100 - winPercent(cpAfter);
+  const nextTurnIsWhite = move.color === 'b';
+  const cpBefore = toCpValue(before.evalCp, before.evalMate, move.color === 'w');
+  const cpAfter = isCheckmate
+    ? move.color === 'w'
+      ? MATE_SCORE
+      : -MATE_SCORE
+    : toCpValue(after.evalCp, after.evalMate, nextTurnIsWhite);
 
-    const accuracy = isCheckmate ? 100 : moveAccuracy(wpBefore, wpAfter);
+  const rawDelta = move.color === 'w' ? cpBefore - cpAfter : cpAfter - cpBefore;
+  const lossCp = isCheckmate ? 0 : Math.max(0, rawDelta);
 
-    if (move.color === 'w') {
-      whiteAccSum += accuracy;
-      whiteAccCount += 1;
-    } else {
-      blackAccSum += accuracy;
-      blackAccCount += 1;
-    }
+  const wpBefore = move.color === 'w' ? winPercent(cpBefore) : 100 - winPercent(cpBefore);
+  const wpAfter = isCheckmate
+    ? 100
+    : move.color === 'w'
+      ? winPercent(cpAfter)
+      : 100 - winPercent(cpAfter);
 
-    const hasSecondLine = before.secondEvalCp !== null || before.secondEvalMate !== null;
-    const gapCp = hasSecondLine
-      ? Math.abs(cpBefore - toCpValue(before.secondEvalCp, before.secondEvalMate, move.color === 'w'))
-      : null;
+  const accuracy = isCheckmate ? 100 : moveAccuracy(wpBefore, wpAfter);
 
-    const missedTactic = detectMissedTactic(
+  const nextAccumulator: AccuracyAccumulator =
+    move.color === 'w'
+      ? { ...accumulator, whiteSum: accumulator.whiteSum + accuracy, whiteCount: accumulator.whiteCount + 1 }
+      : { ...accumulator, blackSum: accumulator.blackSum + accuracy, blackCount: accumulator.blackCount + 1 };
+
+  const hasSecondLine = before.secondEvalCp !== null || before.secondEvalMate !== null;
+  const gapCp = hasSecondLine
+    ? Math.abs(cpBefore - toCpValue(before.secondEvalCp, before.secondEvalMate, move.color === 'w'))
+    : null;
+
+  const missedTactic = detectMissedTactic(move, fenBefore, before, before.evalMate, isCheckmate ? 0 : after.evalMate);
+
+  let sacrificeValue: number | null = null;
+  if (!isCheckmate && move.uci === before.bestMove) {
+    const beforeBoard = new Chess(fenBefore);
+    const afterBoard = new Chess(move.fenAfter);
+    const hanging = detectNewlyHangingPiece(beforeBoard, afterBoard, move.uci, move.color);
+    sacrificeValue = hanging ? hanging.value : null;
+  }
+
+  const classification = classify({
+    lossCp,
+    playedUci: move.uci,
+    bestUci: before.bestMove,
+    wpBefore,
+    wpAfter,
+    isCheckmate,
+    isBook: isBookMove(fenBefore, move.uci),
+    isObviousRecapture: isObviousRecapture(fenBefore, move.uci, i === 0 ? undefined : game.moves[i - 1]),
+    gapCp,
+    sacrificeValue,
+    missedTacticMotif: missedTactic?.motif ?? null,
+  });
+
+  const reviewedMove: ReviewedMove = {
+    ...move,
+    classification,
+    lossCp,
+    evalAfter: isCheckmate
+      ? { cp: null, mate: move.color === 'w' ? 1 : -1 }
+      : { cp: after.evalCp, mate: after.evalMate },
+    bestMoveUci: before.bestMove,
+    explanation: explainMove(
       move,
       fenBefore,
       before,
-      before.evalMate,
-      isCheckmate ? 0 : after.evalMate,
-    );
-
-    let sacrificeValue: number | null = null;
-    if (!isCheckmate && move.uci === before.bestMove) {
-      const beforeBoard = new Chess(fenBefore);
-      const afterBoard = new Chess(move.fenAfter);
-      const hanging = detectNewlyHangingPiece(beforeBoard, afterBoard, move.uci, move.color);
-      sacrificeValue = hanging ? hanging.value : null;
-    }
-
-    const classification = classify({
       lossCp,
-      playedUci: move.uci,
-      bestUci: before.bestMove,
-      wpBefore,
-      wpAfter,
-      isCheckmate,
-      isBook: isBookMove(fenBefore, move.uci),
-      isObviousRecapture: isObviousRecapture(fenBefore, move.uci, i === 0 ? undefined : game.moves[i - 1]),
-      gapCp,
-      sacrificeValue,
-      missedTacticMotif: missedTactic?.motif ?? null,
-    });
-
-    moves.push({
-      ...move,
       classification,
-      lossCp,
-      evalAfter: isCheckmate
-        ? { cp: null, mate: move.color === 'w' ? 1 : -1 }
-        : { cp: after.evalCp, mate: after.evalMate },
-      bestMoveUci: before.bestMove,
-      explanation: explainMove(
-        move,
-        fenBefore,
-        before,
-        lossCp,
-        classification,
-        isCheckmate ? 0 : after.evalMate,
-        missedTactic,
-      ),
-    });
+      isCheckmate ? 0 : after.evalMate,
+      missedTactic,
+    ),
+  };
+
+  return { reviewedMove, accumulator: nextAccumulator };
+}
+
+export function reviewGame(game: ParsedGame, analysis: AnalysisResult[]): GameReview {
+  const moves: ReviewedMove[] = [];
+  let accumulator = EMPTY_ACCURACY_ACCUMULATOR;
+
+  for (let i = 0; i < game.moves.length; i++) {
+    const result = reviewMove(game, i, analysis[i], analysis[i + 1], accumulator);
+    moves.push(result.reviewedMove);
+    accumulator = result.accumulator;
   }
 
-  return {
-    moves,
-    whiteAccuracy: whiteAccCount ? whiteAccSum / whiteAccCount : 100,
-    blackAccuracy: blackAccCount ? blackAccSum / blackAccCount : 100,
-  };
+  return { moves, ...finalizeAccuracy(accumulator) };
 }

@@ -2,6 +2,11 @@ import type { ReviewedMove } from '../lib/reviewEngine.ts';
 
 interface GameGraphProps {
   moves: ReviewedMove[];
+  // Fixes horizontal spacing to the game's full move count, independent
+  // of how many moves are classified so far — without this, the graph
+  // would re-space every existing point each time a new move arrives
+  // during an in-progress review.
+  totalMoves: number;
   currentIndex: number;
   onSelect: (index: number) => void;
 }
@@ -20,10 +25,10 @@ function evalToY(cp: number | null, mate: number | null): number {
   return HEIGHT - (percent / 100) * HEIGHT;
 }
 
-export default function GameGraph({ moves, currentIndex, onSelect }: GameGraphProps) {
-  if (moves.length === 0) return null;
+export default function GameGraph({ moves, totalMoves, currentIndex, onSelect }: GameGraphProps) {
+  if (totalMoves === 0) return null;
 
-  const step = WIDTH / moves.length;
+  const step = WIDTH / totalMoves;
   const linePoints = [
     `0,${HEIGHT / 2}`,
     ...moves.map((m, i) => `${(i + 1) * step},${evalToY(m.evalAfter.cp, m.evalAfter.mate)}`),

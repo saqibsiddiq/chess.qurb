@@ -290,36 +290,64 @@ fn analyze_position(fen: String, depth: u32, engine_path: Option<String>) -> Res
 
 /// Analyzes a whole game's worth of positions using a single Stockfish
 /// process and emits `review-progress` events per move.
+///
+/// The engine session starts synchronously (fast — a UCI handshake, not
+/// a real search) so a missing/broken Stockfish still fails immediately
+/// with a clear error. The actual position-by-position analysis loop
+/// (which can easily take minutes for a long game, especially at
+/// MultiPV=2) runs on its own dedicated OS thread instead of inside this
+/// command handler — a long-running synchronous command previously froze
+/// the whole window ("app not responding") for the duration of the
+/// review, since nothing guarantees Tauri schedules a plain (non-async)
+/// command off whatever thread services window/IPC events. Progress is
+/// reported entirely via `review-progress` events plus a final
+/// `review-complete` (success) or `review-error` (failure) event; this
+/// command itself returns as soon as the thread is spawned.
 #[tauri::command]
 fn analyze_game(
     app: tauri::AppHandle,
     fens: Vec<String>,
     depth: u32,
     engine_path: Option<String>,
-) -> Result<Vec<AnalysisResult>, String> {
+    multi_pv: Option<u32>,
+) -> Result<(), String> {
     let mut session = EngineSession::start_with_path(engine_path.as_deref())?;
-    // Always analyze full-game reviews with MultiPV=2: classification needs
-    // the runner-up line to detect Great/Brilliant, and this is local,
-    // unlimited-use software where the ~2x engine time is an acceptable
-    // trade for classification accuracy.
-    session.set_multipv(2)?;
-    let total = fens.len();
-    let mut results = Vec::with_capacity(total);
+    // MultiPV=2 (the frontend's "Deep" mode) gives classification the
+    // runner-up line needed to detect Great/Brilliant, at roughly 2x engine
+    // time per position — an acceptable trade on desktop, but not
+    // necessarily on weaker hardware. MultiPV=1 ("Fast" mode) skips that
+    // cost; Great/Brilliant simply won't be detected in that mode, which is
+    // an accepted tradeoff, not a bug.
+    session.set_multipv(multi_pv.unwrap_or(2))?;
 
-    for (index, fen) in fens.iter().enumerate() {
-        let res = session.analyze(fen, depth)?;
-        let _ = app.emit(
-            "review-progress",
-            ReviewProgress {
-                index,
-                total,
-                result: res.clone(),
-            },
-        );
-        results.push(res);
-    }
+    std::thread::spawn(move || {
+        let total = fens.len();
+        let mut results = Vec::with_capacity(total);
 
-    Ok(results)
+        for (index, fen) in fens.iter().enumerate() {
+            match session.analyze(fen, depth) {
+                Ok(res) => {
+                    let _ = app.emit(
+                        "review-progress",
+                        ReviewProgress {
+                            index,
+                            total,
+                            result: res.clone(),
+                        },
+                    );
+                    results.push(res);
+                }
+                Err(err) => {
+                    let _ = app.emit("review-error", err);
+                    return;
+                }
+            }
+        }
+
+        let _ = app.emit("review-complete", results);
+    });
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

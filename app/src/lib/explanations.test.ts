@@ -107,6 +107,27 @@ describe('detectNewlyHangingPiece', () => {
   });
 });
 
+describe('explainMove arrow coherence (no redundant/overlapping shapes)', () => {
+  test('a missed fork shows only the fork\'s own arrows, not an extra best-move arrow', () => {
+    const move: ParsedMove = {
+      moveNumber: 1,
+      color: 'w',
+      san: 'Kd1',
+      uci: 'e1d1',
+      fenAfter: '4k3/r3b3/8/8/1N6/8/8/3K4 b - - 0 1',
+    };
+    const beforeFen = '4k3/r3b3/8/8/1N6/8/8/4K3 w - - 0 1';
+    const analysis = mkAnalysis({ bestMove: 'b4c6', evalCp: 300 });
+    const missedTactic = detectMissedTactic(move, beforeFen, analysis);
+    expect(missedTactic?.motif).toBe('fork');
+
+    const explanation = explainMove(move, beforeFen, analysis, 400, 'blunder', null, missedTactic);
+    // Two fork targets -> exactly two shapes, both from the fork itself.
+    expect(explanation.shapes).toHaveLength(2);
+    expect(explanation.shapes.every((s) => s.orig === 'c6')).toBe(true);
+  });
+});
+
 describe('explainMove narration for the new classes', () => {
   const beforeFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
   const move: ParsedMove = {
@@ -126,6 +147,17 @@ describe('explainMove narration for the new classes', () => {
   ] as const)('%s gets its own title, not the generic fallback', (classification, expectedTitle) => {
     const explanation = explainMove(move, beforeFen, analysis, 0, classification, null, null);
     expect(explanation.title).toBe(expectedTitle);
+  });
+
+  test('a positive move that IS the engine\'s top choice gets no arrow (nothing to point to)', () => {
+    const explanation = explainMove(move, beforeFen, analysis, 0, 'best', null, null);
+    expect(explanation.shapes).toEqual([]);
+  });
+
+  test('a positive move that is NOT the engine\'s top choice gets exactly one arrow to it', () => {
+    const differentBest = mkAnalysis({ bestMove: 'd2d4', evalCp: 25 });
+    const explanation = explainMove(move, beforeFen, differentBest, 10, 'excellent', null, null);
+    expect(explanation.shapes).toEqual([{ orig: 'd2', dest: 'd4', brush: 'green' }]);
   });
 
   test('an immediate checkmate is always narrated as Checkmate regardless of classification', () => {
