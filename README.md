@@ -8,7 +8,7 @@ limits.
 
 Chesy's own classification and explanation logic are documented
 approximations of Chess.com's Game Review, not a reverse-engineered
-copy of their (proprietary, undocumented) algorithm — see
+copy of their (proprietary, undocumented) algorithm see
 [`ml/specs/review_contract.md`](ml/specs/review_contract.md) for the
 exact reasoning behind each class.
 
