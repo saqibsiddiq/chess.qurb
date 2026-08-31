@@ -1,5 +1,5 @@
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js';
-import type { AnalysisResult } from './analysis';
+import type { AnalysisResult, Classification } from './analysis';
 import type { ParsedMove } from './parsePgn';
 
 export interface BoardShape {
@@ -38,6 +38,16 @@ const PIECE_NAMES: Record<PieceSymbol, string> = {
   r: 'rook',
   q: 'queen',
   k: 'king',
+};
+
+// Standard pawn-unit values, used for sacrifice detection (Brilliant).
+export const PIECE_VALUES: Record<PieceSymbol, number> = {
+  p: 1,
+  n: 3,
+  b: 3,
+  r: 5,
+  q: 9,
+  k: 0,
 };
 
 function moveFromUci(uci: string): { from: Square; to: Square; promotion?: 'q' | 'r' | 'b' | 'n' } | null {
@@ -153,8 +163,12 @@ function detectLineMotif(board: Chess, start: Square, color: Color): LineMotifRe
 
     // A pin is a line attack on an enemy piece with a more valuable
     // enemy piece behind it. King/queen/rook are the high-priority targets
-    // used by this dataset's motif vocabulary.
-    if (['k', 'q', 'r'].includes(behindResult.piece.type)) {
+    // used by this dataset's motif vocabulary. A king can't itself be
+    // pinned (it's forced to move out of any attack regardless), so a
+    // king-in-front case is excluded here and left to the skewer check
+    // below — otherwise a real skewer through the king would get
+    // misclassified as a pin whenever the piece behind is q/r/k too.
+    if (frontResult.piece.type !== 'k' && ['k', 'q', 'r'].includes(behindResult.piece.type)) {
       return {
         type: 'pin',
         attackerSquare: start,
@@ -265,12 +279,12 @@ function detectBackRank(board: Chess, color: Color): { kingSquare: Square } | nu
   return { kingSquare: enemyKing.square };
 }
 
-function detectNewlyHangingPiece(
+export function detectNewlyHangingPiece(
   before: Chess,
   after: Chess,
   playedUci: string,
   color: Color,
-): { square: Square; name: string; attackerSquare?: Square } | null {
+): { square: Square; name: string; value: number; attackerSquare?: Square } | null {
   const opponent: Color = color === 'w' ? 'b' : 'w';
   const move = moveFromUci(playedUci);
   const movedTo = move?.to;
@@ -301,6 +315,7 @@ function detectNewlyHangingPiece(
       return {
         square,
         name: PIECE_NAMES[piece.type],
+        value: PIECE_VALUES[piece.type],
         attackerSquare: attackers[0],
       };
     }
@@ -345,49 +360,32 @@ function detectFork(
   return null;
 }
 
-export function explainMove(
+export interface MissedTacticResult {
+  motif: 'missed_mate' | 'fork' | 'pin' | 'skewer';
+  title: string;
+  summary: string;
+  detail: string;
+  motifDetail?: Record<string, unknown>;
+  shapes: BoardShape[];
+}
+
+/**
+ * Facts about a tactical opportunity the played move let slip: a forced
+ * mate, or a fork/pin/skewer available via the engine's best move. Computed
+ * independently of classification (unlike the rest of this file) so
+ * reviewEngine.ts's classify() can consult it when deciding Miss — see
+ * ml/specs/review_contract.md section 9 (Chesy approximation).
+ */
+export function detectMissedTactic(
   move: ParsedMove,
   beforeFen: string,
   analysisBefore: AnalysisResult,
-  lossCp: number,
-  classification: 'best' | 'excellent' | 'good' | 'inaccuracy' | 'mistake' | 'blunder',
   evalBeforeMate?: number | null,
   evalAfterMate?: number | null,
-): MoveExplanation {
-  const bestSan = uciToSan(beforeFen, analysisBefore.bestMove);
-  const lossText = formatLoss(lossCp);
-  const beforeBoard = new Chess(beforeFen);
-  const afterBoard = new Chess(move.fenAfter);
+): MissedTacticResult | null {
   const isWhite = move.color === 'w';
+  const bestSan = uciToSan(beforeFen, analysisBefore.bestMove);
 
-  const shapes: BoardShape[] = [];
-
-  // Add green arrow for engine best move
-  const bestMove = moveFromUci(analysisBefore.bestMove);
-  if (bestMove) {
-    shapes.push({
-      orig: bestMove.from,
-      dest: bestMove.to,
-      brush: 'green',
-    });
-  }
-
-  // 1. Immediate Checkmate Played
-  if (afterBoard.isCheckmate()) {
-    const parsed = moveFromUci(move.uci);
-    if (parsed) {
-      shapes.push({ orig: parsed.to, brush: 'yellow' });
-    }
-    return {
-      title: 'Checkmate',
-      summary: `${move.san} delivers immediate checkmate.`,
-      detail: 'A decisive conclusion to the game.',
-      motif: 'mate',
-      shapes,
-    };
-  }
-
-  // 2. Missed Mate / Allowed Mate
   const hadMate =
     evalBeforeMate !== undefined &&
     evalBeforeMate !== null &&
@@ -396,41 +394,148 @@ export function explainMove(
     evalAfterMate !== undefined &&
     evalAfterMate !== null &&
     ((isWhite && evalAfterMate > 0) || (!isWhite && evalAfterMate < 0));
+
+  if (hadMate && !stillMate) {
+    return {
+      motif: 'missed_mate',
+      title: 'Missed mate',
+      summary: `Forced mate was available with ${bestSan}.`,
+      detail: `You played ${move.san} instead, allowing the opponent an escape window.`,
+      shapes: [],
+    };
+  }
+
+  const bestMove = moveFromUci(analysisBefore.bestMove);
+  if (!bestMove || analysisBefore.bestMove === move.uci) return null;
+
+  const testBoard = new Chess(beforeFen);
+  try {
+    testBoard.move(bestMove);
+
+    const fork = detectFork(testBoard, bestMove.to, move.color);
+    if (fork) {
+      const targetNames = fork.targets.map((t) => `the ${t.name} on ${t.square}`).join(' and ');
+      return {
+        motif: 'fork',
+        title: 'Missed fork',
+        summary: `The engine's move ${bestSan} forks ${targetNames}.`,
+        detail: `${move.san} was played instead, letting both targets remain safe.`,
+        motifDetail: { targets: fork.targets },
+        shapes: fork.targets.map((t) => ({ orig: bestMove.to, dest: t.square, brush: 'yellow' as const })),
+      };
+    }
+
+    const pin = detectLineMotif(testBoard, bestMove.to, move.color);
+    if (pin && pin.type === 'pin') {
+      return {
+        motif: 'pin',
+        title: 'Missed pin',
+        summary: `The engine's move ${bestSan} pins the ${pin.frontPiece} on ${pin.frontSquare} to the ${pin.behindPiece} on ${pin.behindSquare}.`,
+        detail: `${move.san} was played instead, letting the ${pin.frontPiece} move freely.`,
+        motifDetail: { piece: pin.frontPiece, target: pin.behindPiece },
+        shapes: [
+          { orig: pin.attackerSquare, dest: pin.frontSquare, brush: 'yellow' },
+          { orig: pin.frontSquare, dest: pin.behindSquare, brush: 'yellow' },
+        ],
+      };
+    }
+    if (pin && pin.type === 'skewer') {
+      return {
+        motif: 'skewer',
+        title: 'Missed skewer',
+        summary: `The engine's move ${bestSan} skewers the ${pin.frontPiece}, winning the ${pin.behindPiece} behind it.`,
+        detail: `${move.san} was played instead, leaving both pieces safe.`,
+        motifDetail: { front: pin.frontPiece, behind: pin.behindPiece },
+        shapes: [
+          { orig: pin.attackerSquare, dest: pin.frontSquare, brush: 'yellow' },
+          { orig: pin.frontSquare, dest: pin.behindSquare, brush: 'yellow' },
+        ],
+      };
+    }
+  } catch {
+    // bestMove might not be legal to replay in edge cases
+  }
+
+  return null;
+}
+
+export function explainMove(
+  move: ParsedMove,
+  beforeFen: string,
+  analysisBefore: AnalysisResult,
+  lossCp: number,
+  classification: Classification,
+  evalAfterMate?: number | null,
+  missedTactic?: MissedTacticResult | null,
+): MoveExplanation {
+  const bestSan = uciToSan(beforeFen, analysisBefore.bestMove);
+  const lossText = formatLoss(lossCp);
+  const beforeBoard = new Chess(beforeFen);
+  const afterBoard = new Chess(move.fenAfter);
+  const isWhite = move.color === 'w';
+  const bestMove = moveFromUci(analysisBefore.bestMove);
+
+  // Every branch below builds its own complete, intentional shape set —
+  // nothing is pre-accumulated here. A shared "always show the engine's
+  // best move" base used to get combined with branch-specific arrows
+  // (e.g. a missed fork's yellow arrows plus a redundant green one from
+  // essentially the same square), which is what actually made arrows
+  // look cluttered/confusing rather than any square being invalid.
+  const bestMoveArrow: BoardShape[] = bestMove ? [{ orig: bestMove.from, dest: bestMove.to, brush: 'green' }] : [];
+
+  // 1. Immediate Checkmate Played
+  if (afterBoard.isCheckmate()) {
+    const parsed = moveFromUci(move.uci);
+    return {
+      title: 'Checkmate',
+      summary: `${move.san} delivers immediate checkmate.`,
+      detail: 'A decisive conclusion to the game.',
+      motif: 'mate',
+      shapes: parsed ? [{ orig: parsed.to, brush: 'yellow' }] : [],
+    };
+  }
+
+  // 2. Missed Mate / Allowed Mate
   const opponentMate =
     evalAfterMate !== undefined &&
     evalAfterMate !== null &&
     ((isWhite && evalAfterMate < 0) || (!isWhite && evalAfterMate > 0));
 
-  if (hadMate && !stillMate) {
+  if (missedTactic?.motif === 'missed_mate') {
     return {
-      title: 'Missed mate',
-      summary: `Forced mate was available with ${bestSan}.`,
-      detail: `You played ${move.san} instead, allowing the opponent an escape window.`,
+      title: missedTactic.title,
+      summary: missedTactic.summary,
+      detail: missedTactic.detail,
       motif: 'missed_mate',
-      shapes,
+      // The one thing worth pointing at is the mating move itself.
+      shapes: bestMoveArrow,
     };
   }
 
   if (opponentMate) {
     const parsed = moveFromUci(move.uci);
-    if (parsed) {
-      shapes.push({ orig: parsed.to, brush: 'red' });
-    }
     return {
       title: 'Allowed mate',
       summary: `${move.san} allows the opponent a forced checkmate sequence.`,
       detail: `The best defense was ${bestSan} to prevent the mating attack.`,
       motif: 'allowed_mate',
-      shapes,
+      // Where the danger came from, plus the defense that avoided it.
+      shapes: [...(parsed ? [{ orig: parsed.to, brush: 'red' as const }] : []), ...bestMoveArrow],
     };
   }
 
   // 3. Hanging / Under-defended Material
   const hanging = detectNewlyHangingPiece(beforeBoard, afterBoard, move.uci, move.color);
-  if (hanging && (classification === 'inaccuracy' || classification === 'mistake' || classification === 'blunder')) {
-    shapes.push({ orig: hanging.square, brush: 'red' });
+  if (
+    hanging &&
+    (classification === 'inaccuracy' ||
+      classification === 'mistake' ||
+      classification === 'blunder' ||
+      classification === 'miss')
+  ) {
+    const hangingShapes: BoardShape[] = [{ orig: hanging.square, brush: 'red' }];
     if (hanging.attackerSquare) {
-      shapes.push({ orig: hanging.attackerSquare, dest: hanging.square, brush: 'red' });
+      hangingShapes.push({ orig: hanging.attackerSquare, dest: hanging.square, brush: 'red' });
     }
     return {
       title: 'Hanging piece',
@@ -438,121 +543,107 @@ export function explainMove(
       detail: `Played ${move.san} (loss: ~${lossText} pawns). The engine preferred ${bestSan} to maintain piece safety.`,
       motif: 'hanging_piece',
       motifDetail: { piece: hanging.name, square: hanging.square },
-      shapes,
+      // What's hanging and to whom, plus what avoids it — two arrows
+      // with clearly different colors/meanings, not redundant.
+      shapes: [...hangingShapes, ...bestMoveArrow],
     };
   }
 
-  // 4. Missed Fork (by engine best move) or Allowed Fork
-  if (bestMove && (classification === 'inaccuracy' || classification === 'mistake' || classification === 'blunder')) {
-    const testBoard = new Chess(beforeFen);
-    try {
-      testBoard.move(bestMove);
-      const fork = detectFork(testBoard, bestMove.to, move.color);
-      if (fork) {
-        for (const t of fork.targets) {
-          shapes.push({ orig: bestMove.to, dest: t.square, brush: 'yellow' });
-        }
-        const targetNames = fork.targets.map((t) => `the ${t.name} on ${t.square}`).join(' and ');
-        return {
-          title: 'Missed fork',
-          summary: `The engine's move ${bestSan} forks ${targetNames}.`,
-          detail: `${move.san} was played instead, letting both targets remain safe.`,
-          motif: 'fork',
-          motifDetail: { targets: fork.targets },
-          shapes,
-        };
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  // 5 & 6. Missed pin / missed skewer (by the engine's best move, not the
-  // move actually played — same "simulate bestMove" pattern as the fork
-  // check above. Checking the played move here would only ever describe
-  // a pin/skewer created *against the opponent*, which is a good outcome
-  // for the mover and can't explain a mistake/blunder row.)
-  const playedMove = moveFromUci(move.uci);
+  // 4, 5 & 6. Missed fork / pin / skewer (by the engine's best move, not the
+  // move actually played) — facts already computed by detectMissedTactic()
+  // in reviewEngine.ts's classify() pass, reused here for narration instead
+  // of re-simulating the best move.
+  const tacticGateOpen =
+    classification === 'inaccuracy' ||
+    classification === 'mistake' ||
+    classification === 'blunder' ||
+    classification === 'miss';
   if (
-    playedMove &&
-    bestMove &&
-    (classification === 'inaccuracy' || classification === 'mistake' || classification === 'blunder')
+    tacticGateOpen &&
+    missedTactic &&
+    (missedTactic.motif === 'fork' || missedTactic.motif === 'pin' || missedTactic.motif === 'skewer')
   ) {
-    const lineTestBoard = new Chess(beforeFen);
-    try {
-      lineTestBoard.move(bestMove);
-      const pin = detectLineMotif(lineTestBoard, bestMove.to, move.color);
-
-      if (pin && pin.type === 'pin') {
-        shapes.push({ orig: pin.attackerSquare, dest: pin.frontSquare, brush: 'yellow' });
-        shapes.push({ orig: pin.frontSquare, dest: pin.behindSquare, brush: 'yellow' });
-        return {
-          title: 'Missed pin',
-          summary: `The engine's move ${bestSan} pins the ${pin.frontPiece} on ${pin.frontSquare} to the ${pin.behindPiece} on ${pin.behindSquare}.`,
-          detail: `${move.san} was played instead, letting the ${pin.frontPiece} move freely.`,
-          motif: 'pin',
-          motifDetail: { piece: pin.frontPiece, target: pin.behindPiece },
-          shapes,
-        };
-      }
-
-      if (pin && pin.type === 'skewer') {
-        shapes.push({ orig: pin.attackerSquare, dest: pin.frontSquare, brush: 'yellow' });
-        shapes.push({ orig: pin.frontSquare, dest: pin.behindSquare, brush: 'yellow' });
-        return {
-          title: 'Missed skewer',
-          summary: `The engine's move ${bestSan} skewers the ${pin.frontPiece}, winning the ${pin.behindPiece} behind it.`,
-          detail: `${move.san} was played instead, leaving both pieces safe.`,
-          motif: 'skewer',
-          motifDetail: { front: pin.frontPiece, behind: pin.behindPiece },
-          shapes,
-        };
-      }
-    } catch {
-      // ignore — bestMove might not be legal to replay in edge cases
-    }
+    return {
+      title: missedTactic.title,
+      summary: missedTactic.summary,
+      detail: missedTactic.detail,
+      motif: missedTactic.motif,
+      motifDetail: missedTactic.motifDetail,
+      // The tactic's own arrows already originate from the best move's
+      // destination square, so a separate green arrow here would just
+      // be a redundant line to (near) the same place.
+      shapes: missedTactic.shapes,
+    };
   }
 
+  const playedMove = moveFromUci(move.uci);
   if (playedMove) {
-    // 7. Discovered Attack
-
     // 7. Discovered Attack
     const discovered = detectDiscoveredAttack(beforeBoard, afterBoard, playedMove, move.color === 'w' ? 'b' : 'w');
     if (discovered) {
-      shapes.push({ orig: discovered.attackerSquare, dest: discovered.targetSquare, brush: 'red' });
       return {
         title: 'Discovered attack',
         summary: `A line has been opened against your ${discovered.targetPiece} on ${discovered.targetSquare}.`,
         detail: `The enemy slider gained direct sight of your piece after ${move.san}.`,
         motif: 'discovered_attack',
         motifDetail: { target: discovered.targetPiece, square: discovered.targetSquare },
-        shapes,
+        shapes: [{ orig: discovered.attackerSquare, dest: discovered.targetSquare, brush: 'red' }],
       };
     }
 
     // 8. Back Rank Weakness
     const backRank = detectBackRank(afterBoard, move.color === 'w' ? 'b' : 'w');
     if (backRank) {
-      shapes.push({ orig: backRank.kingSquare, brush: 'red' });
       return {
         title: 'Back-rank vulnerability',
         summary: `The king on ${backRank.kingSquare} has limited escape mobility on the back rank.`,
         detail: `A back-rank mate threat was created or intensified following ${move.san}.`,
         motif: 'back_rank',
         motifDetail: { kingSquare: backRank.kingSquare },
-        shapes,
+        shapes: [{ orig: backRank.kingSquare, brush: 'red' }],
       };
     }
   }
 
-  // 9. Positive classifications
+  // 9. Positive classifications — only point at the engine's move when it
+  // differs from what was actually played; if they're the same move,
+  // there's nothing to point to.
+  const positiveShapes = move.uci === analysisBefore.bestMove ? [] : bestMoveArrow;
+
+  if (classification === 'brilliant') {
+    return {
+      title: 'Brilliant!!',
+      summary: `${move.san} is a sound sacrifice that's hard to find.`,
+      detail: `The engine confirms ${move.san} holds the advantage despite giving up material.`,
+      motif: 'positive',
+      shapes: positiveShapes,
+    };
+  }
+  if (classification === 'great') {
+    return {
+      title: 'Great move!',
+      summary: `${move.san} was the only move that kept the position together.`,
+      detail: `Any other reasonable try here loses significant ground.`,
+      motif: 'positive',
+      shapes: positiveShapes,
+    };
+  }
+  if (classification === 'book') {
+    return {
+      title: 'Book move',
+      summary: `${move.san} follows known opening theory.`,
+      detail: `Common in games at this stage of the opening.`,
+      motif: 'positive',
+      shapes: positiveShapes,
+    };
+  }
   if (classification === 'best' || classification === 'excellent' || classification === 'good') {
     return {
       title: classification === 'best' ? 'Best move' : 'Solid continuation',
       summary: `${move.san} keeps the position balanced and active.`,
       detail: `The engine's top choice was ${bestSan}.`,
       motif: 'positive',
-      shapes,
+      shapes: positiveShapes,
     };
   }
 
@@ -562,6 +653,6 @@ export function explainMove(
     summary: `No single tactical blunder detected; positional balance shifted by ~${lossText} pawns.`,
     detail: `The engine favored ${bestSan} to maintain optimal piece activity.`,
     motif: 'evaluation',
-    shapes,
+    shapes: bestMoveArrow,
   };
 }

@@ -21,8 +21,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, TextIO
 
-BAD_CLASSES = {"inaccuracy", "mistake", "blunder"}
-VALID_CLASSES = {"best", "excellent", "good", "inaccuracy", "mistake", "blunder"}
+BAD_CLASSES = {"inaccuracy", "mistake", "blunder", "miss"}
 
 
 def split_for_game(game_id: str, seed: int) -> str:

@@ -16,7 +16,9 @@ REQUIRED = {
     "loss_cp", "classification", "best_move_san", "best_move_uci",
     "motif", "motif_detail", "explanation",
 }
-CLASSIFICATIONS = {"best", "excellent", "good", "inaccuracy", "mistake", "blunder"}
+# Great/Brilliant are intentionally absent — dataset/src/extractor.py
+# doesn't produce them yet, see ml/specs/classification_policy.md.
+CLASSIFICATIONS = {"best", "excellent", "good", "book", "inaccuracy", "mistake", "miss", "blunder"}
 
 
 def audit_file(path: Path, report: dict[str, Any]) -> None:

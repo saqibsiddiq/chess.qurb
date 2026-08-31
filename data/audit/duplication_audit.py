@@ -6,9 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "dataset" / "src"))
+import classify  # noqa: E402
 
 REQUIRED = {
     "game_id", "fen", "move_number", "color", "played_san", "played_uci",
@@ -16,25 +20,11 @@ REQUIRED = {
     "loss_cp", "classification", "best_move_san", "best_move_uci",
     "motif", "motif_detail", "explanation",
 }
-VALID_CLASSES = {"best", "excellent", "good", "inaccuracy", "mistake", "blunder"}
+# Great/Brilliant are intentionally absent — dataset/src/extractor.py
+# doesn't produce them yet, see ml/specs/classification_policy.md.
+VALID_CLASSES = {"best", "excellent", "good", "book", "inaccuracy", "mistake", "miss", "blunder"}
 VALID_COLORS = {"white", "black"}
-BAD_CLASSES = {"inaccuracy", "mistake", "blunder"}
-
-
-def expected_classification(loss_cp: float, played_uci: str, best_uci: str | None) -> str:
-    if best_uci is not None and played_uci == best_uci:
-        return "best"
-    if loss_cp < 5:
-        return "best"
-    if loss_cp < 20:
-        return "excellent"
-    if loss_cp < 50:
-        return "good"
-    if loss_cp < 100:
-        return "inaccuracy"
-    if loss_cp < 200:
-        return "mistake"
-    return "blunder"
+BAD_CLASSES = {"inaccuracy", "mistake", "miss", "blunder"}
 
 
 def add_example(examples: list[dict[str, Any]], item: dict[str, Any], limit: int = 20) -> None:
@@ -149,12 +139,12 @@ def audit_file(path: Path, report: dict[str, Any]) -> None:
                     fr["negative_loss"] += 1
 
                 if cls in VALID_CLASSES and math.isfinite(float(loss)):
-                    expected = expected_classification(
-                        float(loss), row["played_uci"], row["best_move_uci"]
-                    )
-                    # Checkmate rows can be overridden to "best" by the extractor.
-                    # This is still expected when motif == mate.
-                    if expected != cls and motif != "mate":
+                    # classify_row() reconstructs the actual board and
+                    # checks is_checkmate() directly, so unlike the old
+                    # cp-loss-only mirror this no longer needs a
+                    # motif == "mate" exemption for checkmate rows.
+                    expected = classify.classify_row(row).classification
+                    if expected != cls:
                         fr["classification_mismatches"] += 1
                         add_example(report["examples"]["classification_mismatches"], {
                             "file": worker,

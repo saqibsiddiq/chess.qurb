@@ -20,6 +20,9 @@ dist/
 # Tauri / Rust
 target/
 app/src-tauri/target/
+# Tauri mobile scaffolding (Android/iOS gen projects + build caches) —
+# regenerate with `tauri android init` / `tauri ios init` when needed.
+app/src-tauri/gen/
 
 # OS / editors
 .DS_Store
@@ -43,6 +46,10 @@ data/phase6a_pipeline/*.jsonl
 *.pgn
 *.pgn.zst
 *.jsonl
+*.jsonl.pre-reclassify
+
+# Claude Code local runtime state (launch.json is intentional config, keep that)
+.claude/*.lock
 
 # Local generated artifacts
 reports/generated/

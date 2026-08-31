@@ -271,6 +271,7 @@ def _line_motif(
 
         if (
             motif == "pin"
+            and front.piece_type != chess.KING
             and behind.piece_type
             in (
                 chess.KING,

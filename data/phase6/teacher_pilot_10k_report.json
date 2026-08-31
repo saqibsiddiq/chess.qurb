@@ -3,35 +3,39 @@
   "seed": 42,
   "input": "/home/saqib/Projects/chesy/data/phase6/train.jsonl",
   "output": "/home/saqib/Projects/chesy/data/phase6/teacher_pilot_10k.jsonl",
-  "input_rows_scanned": 1326352,
+  "input_rows_scanned": 1082394,
   "invalid_rows": 0,
   "requested_quotas": {
     "rare_edge": 1000,
     "blunder": 2500,
     "mistake": 2000,
+    "miss": 1000,
     "inaccuracy": 1500,
     "other_motif": 1000,
-    "good_excellent": 1000,
-    "best": 1000
+    "good_excellent": 500,
+    "best": 500
   },
   "available_by_bucket": {
-    "best": 205529,
-    "good_excellent": 218645,
-    "inaccuracy": 363487,
-    "mistake": 255756,
-    "blunder": 218462,
-    "rare_edge": 64473
+    "good_excellent": 306100,
+    "best": 178822,
+    "other_motif": 75472,
+    "inaccuracy": 220610,
+    "mistake": 109740,
+    "miss": 32878,
+    "rare_edge": 64473,
+    "blunder": 94299
   },
   "selected_by_bucket": {
     "rare_edge": 1000,
     "blunder": 2500,
     "mistake": 2000,
+    "miss": 1000,
     "inaccuracy": 1500,
-    "other_motif": 0,
-    "good_excellent": 1000,
-    "best": 1000
+    "other_motif": 1000,
+    "good_excellent": 500,
+    "best": 500
   },
-  "selected_total": 9000,
+  "selected_total": 10000,
   "rare_edge_motifs": [
     "allowed_mate",
     "back_rank",

@@ -1,7 +1,24 @@
 use serde::Serialize;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use tauri::Emitter;
+use tauri::{path::BaseDirectory, Emitter, Manager};
+
+/// Picks which Stockfish executable to launch. An explicit `engine_path`
+/// (e.g. a future settings UI) always wins. Otherwise, prefer the copy
+/// bundled into the app as a resource (see src-tauri/binaries/README.md)
+/// so a packaged build works without the user installing Stockfish
+/// separately — falling back to a bare `stockfish` lookup on $PATH when
+/// no bundled copy is present, which is what happens in `tauri dev`
+/// (resources are only laid out on disk by a real `tauri build`).
+fn resolve_engine_path(app: &tauri::AppHandle, engine_path: Option<String>) -> String {
+    if let Some(path) = engine_path {
+        return path;
+    }
+    match app.path().resolve("binaries/stockfish", BaseDirectory::Resource) {
+        Ok(resolved) if resolved.exists() => resolved.to_string_lossy().into_owned(),
+        _ => "stockfish".to_string(),
+    }
+}
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -11,6 +28,13 @@ pub struct AnalysisResult {
     pub eval_mate: Option<i32>,
     pub pv: Vec<String>,
     pub depth: u32,
+    // Second-best line from a MultiPV=2 search (analyze_game() only). Used
+    // to detect "only good move" (Great) / sacrifice (Brilliant) situations
+    // client-side. Left None by analyze_position()/check_engine(), which
+    // never enable MultiPV.
+    pub second_move: Option<String>,
+    pub second_eval_cp: Option<i32>,
+    pub second_eval_mate: Option<i32>,
 }
 
 #[derive(Serialize, Clone)]
@@ -84,6 +108,14 @@ impl EngineSession {
         writeln!(self.stdin, "{cmd}").map_err(|e| e.to_string())
     }
 
+    /// Enables (or disables, with value 1) MultiPV. Used by analyze_game()
+    /// so classification can compare the best line against the runner-up.
+    fn set_multipv(&mut self, value: u32) -> Result<(), String> {
+        self.send(&format!("setoption name MultiPV value {value}"))?;
+        self.send("isready")?;
+        self.wait_for("readyok")
+    }
+
     fn wait_for_uci_ok(&mut self) -> Result<Option<String>, String> {
         let mut line = String::new();
         let mut engine_name = None;
@@ -123,7 +155,13 @@ impl EngineSession {
         self.send(&format!("position fen {fen}"))?;
         self.send(&format!("go depth {depth}"))?;
 
-        let mut last_info: Option<String> = None;
+        // With MultiPV>1, Stockfish prints one "info ... multipv N ..." line
+        // per line per depth. A single `last_info` slot would get silently
+        // overwritten by whichever multipv index happens to arrive last —
+        // routing by the `multipv` token keeps the best (multipv 1) and
+        // runner-up (multipv 2) lines separate.
+        let mut last_info_pv1: Option<String> = None;
+        let mut last_info_pv2: Option<String> = None;
         let mut best_move = String::new();
         let mut line = String::new();
 
@@ -139,7 +177,11 @@ impl EngineSession {
                     || trimmed.contains(" score mate ")
                     || trimmed.contains(" pv "))
             {
-                last_info = Some(trimmed.to_string());
+                let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+                match multipv_index(&tokens) {
+                    2 => last_info_pv2 = Some(trimmed.to_string()),
+                    _ => last_info_pv1 = Some(trimmed.to_string()),
+                }
             } else if trimmed.starts_with("bestmove") {
                 let raw_best = trimmed.split_whitespace().nth(1).unwrap_or("").to_string();
                 if raw_best != "(none)" {
@@ -149,7 +191,7 @@ impl EngineSession {
             }
         }
 
-        let mut result = last_info
+        let mut result = last_info_pv1
             .map(|info| parse_info_line(&info, best_move.clone(), depth))
             .unwrap_or(AnalysisResult {
                 best_move,
@@ -157,12 +199,24 @@ impl EngineSession {
                 eval_mate: None,
                 pv: Vec::new(),
                 depth,
+                second_move: None,
+                second_eval_cp: None,
+                second_eval_mate: None,
             });
+
+        if let Some(info2) = last_info_pv2 {
+            let parsed2 = parse_info_line(&info2, String::new(), depth);
+            result.second_move = parsed2.pv.first().cloned();
+            result.second_eval_cp = parsed2.eval_cp;
+            result.second_eval_mate = parsed2.eval_mate;
+        }
 
         // Normalize to "positive = good for White".
         if fen.split_whitespace().nth(1) == Some("b") {
             result.eval_cp = result.eval_cp.map(|v| -v);
             result.eval_mate = result.eval_mate.map(|v| -v);
+            result.second_eval_cp = result.second_eval_cp.map(|v| -v);
+            result.second_eval_mate = result.second_eval_mate.map(|v| -v);
         }
 
         Ok(result)
@@ -174,6 +228,19 @@ impl Drop for EngineSession {
         let _ = self.send("quit");
         let _ = self.child.wait();
     }
+}
+
+/// Reads the `multipv N` token from an already-tokenized UCI `info` line.
+/// Defaults to 1 when absent (some engines/modes omit it for single-PV output).
+fn multipv_index(tokens: &[&str]) -> u32 {
+    let mut i = 0;
+    while i < tokens.len() {
+        if tokens[i] == "multipv" {
+            return tokens.get(i + 1).and_then(|v| v.parse().ok()).unwrap_or(1);
+        }
+        i += 1;
+    }
+    1
 }
 
 fn parse_info_line(line: &str, best_move: String, depth: u32) -> AnalysisResult {
@@ -207,12 +274,15 @@ fn parse_info_line(line: &str, best_move: String, depth: u32) -> AnalysisResult 
         eval_mate,
         pv,
         depth,
+        second_move: None,
+        second_eval_cp: None,
+        second_eval_mate: None,
     }
 }
 
 #[tauri::command]
-fn check_engine(engine_path: Option<String>) -> EngineInfo {
-    let path = engine_path.unwrap_or_else(|| "stockfish".to_string());
+fn check_engine(app: tauri::AppHandle, engine_path: Option<String>) -> EngineInfo {
+    let path = resolve_engine_path(&app, engine_path);
     match EngineSession::start_with_path(Some(&path)) {
         Ok(session) => EngineInfo {
             available: true,
@@ -230,38 +300,78 @@ fn check_engine(engine_path: Option<String>) -> EngineInfo {
 }
 
 #[tauri::command]
-fn analyze_position(fen: String, depth: u32, engine_path: Option<String>) -> Result<AnalysisResult, String> {
-    let mut session = EngineSession::start_with_path(engine_path.as_deref())?;
+fn analyze_position(
+    app: tauri::AppHandle,
+    fen: String,
+    depth: u32,
+    engine_path: Option<String>,
+) -> Result<AnalysisResult, String> {
+    let path = resolve_engine_path(&app, engine_path);
+    let mut session = EngineSession::start_with_path(Some(&path))?;
     session.analyze(&fen, depth)
 }
 
 /// Analyzes a whole game's worth of positions using a single Stockfish
 /// process and emits `review-progress` events per move.
+///
+/// The engine session starts synchronously (fast — a UCI handshake, not
+/// a real search) so a missing/broken Stockfish still fails immediately
+/// with a clear error. The actual position-by-position analysis loop
+/// (which can easily take minutes for a long game, especially at
+/// MultiPV=2) runs on its own dedicated OS thread instead of inside this
+/// command handler — a long-running synchronous command previously froze
+/// the whole window ("app not responding") for the duration of the
+/// review, since nothing guarantees Tauri schedules a plain (non-async)
+/// command off whatever thread services window/IPC events. Progress is
+/// reported entirely via `review-progress` events plus a final
+/// `review-complete` (success) or `review-error` (failure) event; this
+/// command itself returns as soon as the thread is spawned.
 #[tauri::command]
 fn analyze_game(
     app: tauri::AppHandle,
     fens: Vec<String>,
     depth: u32,
     engine_path: Option<String>,
-) -> Result<Vec<AnalysisResult>, String> {
-    let mut session = EngineSession::start_with_path(engine_path.as_deref())?;
-    let total = fens.len();
-    let mut results = Vec::with_capacity(total);
+    multi_pv: Option<u32>,
+) -> Result<(), String> {
+    let path = resolve_engine_path(&app, engine_path);
+    let mut session = EngineSession::start_with_path(Some(&path))?;
+    // MultiPV=2 (the frontend's "Deep" mode) gives classification the
+    // runner-up line needed to detect Great/Brilliant, at roughly 2x engine
+    // time per position — an acceptable trade on desktop, but not
+    // necessarily on weaker hardware. MultiPV=1 ("Fast" mode) skips that
+    // cost; Great/Brilliant simply won't be detected in that mode, which is
+    // an accepted tradeoff, not a bug.
+    session.set_multipv(multi_pv.unwrap_or(2))?;
 
-    for (index, fen) in fens.iter().enumerate() {
-        let res = session.analyze(fen, depth)?;
-        let _ = app.emit(
-            "review-progress",
-            ReviewProgress {
-                index,
-                total,
-                result: res.clone(),
-            },
-        );
-        results.push(res);
-    }
+    std::thread::spawn(move || {
+        let total = fens.len();
+        let mut results = Vec::with_capacity(total);
 
-    Ok(results)
+        for (index, fen) in fens.iter().enumerate() {
+            match session.analyze(fen, depth) {
+                Ok(res) => {
+                    let _ = app.emit(
+                        "review-progress",
+                        ReviewProgress {
+                            index,
+                            total,
+                            result: res.clone(),
+                        },
+                    );
+                    results.push(res);
+                }
+                Err(err) => {
+                    let _ = app.emit("review-error", err);
+                    return;
+                }
+            }
+        }
+
+        let _ = app.emit("review-complete", results);
+    });
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
