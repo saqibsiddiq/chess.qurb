@@ -51,6 +51,9 @@ data/phase6a_pipeline/*.jsonl
 # Claude Code local tooling config/state — not checked in
 .claude/
 
+# Trained model weights/checkpoints — large, regenerable via ml/training/
+ml/models/
+
 # Local generated artifacts
 reports/generated/
 data/experiments/generated/
