@@ -48,8 +48,8 @@ data/phase6a_pipeline/*.jsonl
 *.jsonl
 *.jsonl.pre-reclassify
 
-# Claude Code local runtime state (launch.json is intentional config, keep that)
-.claude/*.lock
+# Claude Code local tooling config/state — not checked in
+.claude/
 
 # Local generated artifacts
 reports/generated/
