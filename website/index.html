@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chesy — Chess game review, offline and unlimited</title>
+  <meta name="description"
+    content="Review your chess games like a Grandmaster. Chesy runs real Stockfish locally and classifies every move — Brilliant through Blunder — with no account, no server and no limits.">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://chesy.app">
+  <meta property="og:title" content="Chesy — Chess game review, offline and unlimited">
+  <meta property="og:description"
+    content="Real Stockfish evaluations and full move classification, running entirely on your machine.">
+  <meta property="og:image" content="https://chesy.app/og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Chesy — Chess game review, offline and unlimited">
+  <meta name="twitter:description"
+    content="Real Stockfish evaluations and full move classification, running entirely on your machine.">
+  <meta name="twitter:image" content="https://chesy.app/og.png">
+  <meta name="theme-color" content="#ffffff">
+
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23121317' d='M11 1.2h2v2.1h2.1v2H13v2.4h-2V5.3H8.9v-2H11z M12 8.4c2.6-2.1 6.6-1.6 7.6 1.3.8 2.3-.6 4.3-2.3 5.6l-1.5 1.1H8.2l-1.5-1.1c-1.7-1.3-3.1-3.3-2.3-5.6C5.4 6.8 9.4 6.3 12 8.4z M4.6 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H4.6a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z'/%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500&family=Google+Sans+Flex:opsz,slnt,wdth,wght@8..144,-10..0,25..150,400..500&display=swap">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- ═════════════ Header ═════════════ -->
+  <header class="site-header" id="site-header">
+    <div class="container">
+      <div class="header-inner">
+
+        <a class="logo" href="#" aria-label="Chesy home">
+          <svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M11 1.2h2v2.1h2.1v2H13v2.4h-2V5.3H8.9v-2H11zM12 8.4c2.6-2.1 6.6-1.6 7.6 1.3.8 2.3-.6 4.3-2.3 5.6l-1.5 1.1H8.2l-1.5-1.1c-1.7-1.3-3.1-3.3-2.3-5.6C5.4 6.8 9.4 6.3 12 8.4zM4.6 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H4.6a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z" />
+          </svg>
+          <span>Chesy</span>
+        </a>
+
+        <button class="nav-toggle" id="nav-toggle" aria-label="Open navigation" aria-expanded="false"
+          aria-controls="nav">
+          <span></span><span></span><span></span>
+        </button>
+
+        <nav class="nav" id="nav">
+          <a class="nav-link" href="#product">Product</a>
+          <a class="nav-link" href="#classification">Classification</a>
+          <a class="nav-link" href="#how">How it works</a>
+          <a class="nav-link" href="https://github.com/saqibsiddiq/chesy" target="_blank" rel="noopener">GitHub</a>
+          <a class="btn btn-primary" href="#download">Download</a>
+        </nav>
+
+      </div>
+    </div>
+  </header>
+
+
+  <!-- ═════════════ Hero ═════════════ -->
+  <section class="hero" id="hero">
+    <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
+
+    <div class="container">
+      <div class="hero-inner">
+
+        <p class="hero-lockup">
+          <svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M11 1.2h2v2.1h2.1v2H13v2.4h-2V5.3H8.9v-2H11zM12 8.4c2.6-2.1 6.6-1.6 7.6 1.3.8 2.3-.6 4.3-2.3 5.6l-1.5 1.1H8.2l-1.5-1.1c-1.7-1.3-3.1-3.3-2.3-5.6C5.4 6.8 9.4 6.3 12 8.4zM4.6 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H4.6a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z" />
+          </svg>
+          <span>Chesy</span>
+          <span class="dim">Game Review</span>
+        </p>
+
+        <h1 class="display hero-title">Review your games like a Grandmaster</h1>
+
+        <p class="t-lg hero-sub">
+          Load any PGN and get real Stockfish evaluations with a full
+          move-by-move classification — Brilliant, Great, Blunder and
+          everything in between. No account, no server, no limits.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#download">
+            <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 3a1 1 0 0 1 1 1v9.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.4l3.3 3.3V4a1 1 0 0 1 1-1zM4 18a1 1 0 0 1 1 1v.5h14V19a1 1 0 1 1 2 0v1.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V19a1 1 0 0 1 1-1z" />
+            </svg>
+            Download Chesy
+          </a>
+          <a class="btn btn-secondary" href="#product">Explore the review</a>
+        </div>
+
+        <p class="t-xs hero-meta">
+          <span>Runs offline</span>
+          <span class="sep" aria-hidden="true"></span>
+          <span>macOS, Windows &amp; Linux</span>
+          <span class="sep" aria-hidden="true"></span>
+          <span>GPLv3</span>
+        </p>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═════════════ Chip rail ═════════════ -->
+  <section class="section-tight">
+    <div class="container">
+      <div class="chip-rail stagger-group" role="list">
+        <span class="chip stagger-item" role="listitem"><span class="chip-dot"
+            style="background:var(--c-brilliant)"></span>Brilliant</span>
+        <span class="chip stagger-item" role="listitem"><span class="chip-dot"
+            style="background:var(--c-great)"></span>Great</span>
+        <span class="chip stagger-item" role="listitem"><span class="chip-dot"
+            style="background:var(--c-best)"></span>Best</span>
+        <span class="chip stagger-item" role="listitem"><span class="chip-dot"
+            style="background:var(--c-excellent)"></span>Excellent</span>
+        <span class="chip stagger-item" role="listitem"><span class="chip-dot"
+            style="background:var(--c-book)"></span>Book</span>
+        <span class="chip stagger-item" role="listitem"><span class="chip-dot"
+            style="background:var(--c-inaccuracy)"></span>Inaccuracy</span>
+        <span class="chip stagger-item" role="listitem"><span class="chip-dot"
+            style="background:var(--c-mistake)"></span>Mistake</span>
+        <span class="chip stagger-item" role="listitem"><span class="chip-dot"
+            style="background:var(--c-blunder)"></span>Blunder</span>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═════════════ Statement ═════════════ -->
+  <section class="section">
+    <div class="container">
+      <h2 class="t-9xl statement reveal">
+        Chesy is a local-first review engine that explains
+        every move the way a coach would.
+      </h2>
+    </div>
+  </section>
+
+
+  <!-- ═════════════ Product ═════════════ -->
+  <section class="section" id="product">
+    <div class="container">
+
+      <div class="section-head reveal">
+        <p class="eyebrow">Product</p>
+        <h2 class="t-7xl">Everything you need to improve</h2>
+        <p class="t-lg">Full-strength Stockfish under the hood — not a throttled cloud engine.</p>
+      </div>
+
+      <div class="card-stack">
+
+        <div class="card card-dark card-feature card-split reveal">
+          <div>
+            <div class="card-icon" style="background:rgba(230,234,240,.06);border-color:var(--inverse-outline)">
+              <svg viewBox="0 0 24 24" aria-hidden="true" style="fill:#f8f9fc">
+                <path
+                  d="M5.6 2.8h3.7v2.1h1.8V2.8h1.8v2.1h1.8V2.8h3.7v5.5l-1.9 1.8v5.4l1.9 1.8v1.3H5.6v-1.3l1.9-1.8V10.1L5.6 8.3zM4.6 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H4.6a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z" />
+              </svg>
+            </div>
+            <h3 class="t-4xl">Every move, classified</h3>
+            <p>Chesy scores each position, compares what you played against the
+              engine's best line, and labels the move the way you already read
+              a review — then tells you plainly what changed.</p>
+          </div>
+
+          <div class="mock" aria-hidden="true">
+            <div class="mock-bar">
+              <span class="mock-dot"></span><span class="mock-dot"></span><span class="mock-dot"></span>
+              <span style="margin-left:6px">rapid_2026.pgn — depth 20</span>
+            </div>
+            <div class="mock-body">
+              <div class="eval-bar">
+                <div class="eval-fill" id="eval-fill" style="height:38%"></div>
+              </div>
+              <div class="mock-moves">
+                <div class="mock-move">
+                  <span class="num">14.</span><span class="san">Nf5</span>
+                  <span class="badge" style="background:var(--c-best)">✓</span>
+                  <span class="tag" style="color:var(--c-best)">Best</span>
+                </div>
+                <div class="mock-move">
+                  <span class="num">14…</span><span class="san">Bxf5</span>
+                  <span class="badge" style="background:var(--c-excellent)">✓</span>
+                  <span class="tag" style="color:var(--c-excellent)">Excellent</span>
+                </div>
+                <div class="mock-move is-active">
+                  <span class="num">15.</span><span class="san">Qh5</span>
+                  <span class="badge" style="background:var(--c-brilliant)">!!</span>
+                  <span class="tag" style="color:var(--c-brilliant)">Brilliant</span>
+                </div>
+                <div class="mock-move">
+                  <span class="num">15…</span><span class="san">g6</span>
+                  <span class="badge" style="background:var(--c-blunder)">??</span>
+                  <span class="tag" style="color:var(--c-blunder)">Blunder</span>
+                </div>
+                <div class="mock-move">
+                  <span class="num">16.</span><span class="san">Qxh7#</span>
+                  <span class="badge" style="background:var(--c-best)">✓</span>
+                  <span class="tag" style="color:var(--c-best)">Best</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-duo">
+
+          <div class="card reveal">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M9.4 17.4c0-2.6 1-4 2.6-5.3 1.3-1 2-1.7 2-2.5 0-.5-.3-.9-.8-.9-.6 0-1 .4-1.6 1.2l-1.2 1.6-2.1-1.3 1.9-4.1C11.4 3.4 13.3 2 15.6 2c2.6 0 4.1 2 4.4 5 .3 3.2.2 7-.1 10.4zM5 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H5a1.1 1.1 0 0 1-1.1-1.1v-1.6A1.1 1.1 0 0 1 5 18.6z" />
+              </svg>
+            </div>
+            <h3 class="t-2xl">Real Stockfish, locally</h3>
+            <p>Full-strength Stockfish runs on your own machine over UCI.
+              No request caps, no queue, no watered-down cloud engine.</p>
+          </div>
+
+          <div class="card reveal">
+            <div class="card-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 1.6a1.8 1.8 0 0 1 1.3 3c2.6 2 4.1 4.5 4.1 6.9 0 2.2-1.2 3.8-2.5 4.7h-1.4l1.6-2.4-2.2-3.4-1 1.1 1.5 2.3-1.5 2.4H9.1c-1.3-.9-2.5-2.5-2.5-4.7 0-2.4 1.5-4.9 4.1-6.9a1.8 1.8 0 0 1 1.3-3zM8.4 17.2h7.2l.5 1.4H7.9zM5.2 18.6h13.6a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H5.2a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z" />
+              </svg>
+            </div>
+            <h3 class="t-2xl">Private by construction</h3>
+            <p>No accounts, no telemetry, no network calls at runtime.
+              Your games never leave the machine you played them on.</p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═════════════ Classification ═════════════ -->
+  <section class="section" id="classification">
+    <div class="container">
+
+      <div class="section-head reveal">
+        <p class="eyebrow">Classification</p>
+        <h2 class="t-7xl">Ten labels for every move you play</h2>
+        <p class="t-lg">The same vocabulary you already read a game review in.</p>
+      </div>
+
+      <div class="legend stagger-group">
+        <div class="legend-item stagger-item"><span class="badge"
+            style="background:var(--c-brilliant)">!!</span><span><span class="name">Brilliant</span><span class="desc">A
+              sound sacrifice you found</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge" style="background:var(--c-great)">!</span><span><span
+              class="name">Great</span><span class="desc">The only move that holds</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge" style="background:var(--c-best)">✓</span><span><span
+              class="name">Best</span><span class="desc">Matches the engine's top line</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge"
+            style="background:var(--c-excellent)">✓</span><span><span class="name">Excellent</span><span
+              class="desc">Loses almost nothing</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge" style="background:var(--c-good)">○</span><span><span
+              class="name">Good</span><span class="desc">Reasonable, slightly inferior</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge" style="background:var(--c-book)">▤</span><span><span
+              class="name">Book</span><span class="desc">Known opening theory</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge"
+            style="background:var(--c-inaccuracy)">?!</span><span><span class="name">Inaccuracy</span><span
+              class="desc">Gives away a small edge</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge"
+            style="background:var(--c-mistake)">?</span><span><span class="name">Mistake</span><span class="desc">Swings
+              the evaluation</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge" style="background:var(--c-miss)">×</span><span><span
+              class="name">Miss</span><span class="desc">A win was there to take</span></span></div>
+        <div class="legend-item stagger-item"><span class="badge"
+            style="background:var(--c-blunder)">??</span><span><span class="name">Blunder</span><span class="desc">Loses
+              material or the game</span></span></div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═════════════ How it works ═════════════ -->
+  <section class="section" id="how">
+    <div class="container">
+
+      <div class="section-head reveal">
+        <p class="eyebrow">How it works</p>
+        <h2 class="t-7xl">Three steps to a full review</h2>
+        <p class="t-lg">From raw PGN to a move-by-move breakdown in seconds.</p>
+      </div>
+
+      <div class="steps stagger-group">
+        <div class="step stagger-item">
+          <span class="num">01</span>
+          <h3 class="t-2xl">Load your PGN</h3>
+          <p>Paste the text or open a file. Chesy reads it straight away — no import wizard, no format wrangling.</p>
+        </div>
+        <div class="step stagger-item">
+          <span class="num">02</span>
+          <h3 class="t-2xl">Stockfish analyses</h3>
+          <p>Every position gets a deep local evaluation: centipawn scores, best lines and per-side accuracy.</p>
+        </div>
+        <div class="step stagger-item">
+          <span class="num">03</span>
+          <h3 class="t-2xl">Review and improve</h3>
+          <p>Walk the game move by move with colour-coded labels and plain-English explanations of what changed.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═════════════ Download ═════════════ -->
+  <section class="section" id="download">
+    <div class="container">
+      <div class="cta reveal">
+        <canvas class="cta-canvas" id="cta-canvas" aria-hidden="true"></canvas>
+        <div class="cta-inner">
+          <h2 class="t-9xl">Download Chesy</h2>
+          <p class="t-lg">Free and open source. Grab a build for your platform, or
+            compile from source — Stockfish is bundled either way.</p>
+          <div class="cta-actions">
+            <a class="btn btn-on-dark" href="https://github.com/saqibsiddiq/chesy/releases" target="_blank"
+              rel="noopener">
+              <svg class="btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 3a1 1 0 0 1 1 1v9.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.4l3.3 3.3V4a1 1 0 0 1 1-1zM4 18a1 1 0 0 1 1 1v.5h14V19a1 1 0 1 1 2 0v1.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V19a1 1 0 0 1 1-1z" />
+              </svg>
+              Latest release
+            </a>
+            <a class="btn btn-secondary"
+              style="background:rgba(230,234,240,.1);color:#f8f9fc;border-color:var(--inverse-outline)"
+              href="https://github.com/saqibsiddiq/chesy" target="_blank" rel="noopener">View source</a>
+          </div>
+          <p class="t-xs cta-note">macOS · Windows · Linux · GPLv3</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═════════════ Footer ═════════════ -->
+  <footer class="site-footer">
+    <div class="container">
+
+      <div class="footer-grid">
+        <div class="footer-col">
+          <a class="logo" href="#" aria-label="Chesy home">
+            <svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M11 1.2h2v2.1h2.1v2H13v2.4h-2V5.3H8.9v-2H11zM12 8.4c2.6-2.1 6.6-1.6 7.6 1.3.8 2.3-.6 4.3-2.3 5.6l-1.5 1.1H8.2l-1.5-1.1c-1.7-1.3-3.1-3.3-2.3-5.6C5.4 6.8 9.4 6.3 12 8.4zM4.6 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H4.6a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z" />
+            </svg>
+            <span>Chesy</span>
+          </a>
+          <p class="t-xs muted" style="margin-top:16px;max-width:32ch">Local-first chess game review, powered by
+            Stockfish.</p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Product</h4>
+          <ul>
+            <li><a href="#product">Review</a></li>
+            <li><a href="#classification">Classification</a></li>
+            <li><a href="#how">How it works</a></li>
+            <li><a href="#download">Download</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Source</h4>
+          <ul>
+            <li><a href="https://github.com/saqibsiddiq/chesy" target="_blank" rel="noopener">Repository</a></li>
+            <li><a href="https://github.com/saqibsiddiq/chesy/releases" target="_blank" rel="noopener">Releases</a></li>
+            <li><a href="https://github.com/saqibsiddiq/chesy/issues" target="_blank" rel="noopener">Issues</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <ul>
+            <li><a href="https://github.com/saqibsiddiq/chesy/blob/main/LICENSE" target="_blank"
+                rel="noopener">Licence</a></li>
+            <li><a href="https://stockfishchess.org" target="_blank" rel="noopener">Stockfish</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom t-xs">
+        <span>© 2026 Chesy. Open source under GPLv3.</span>
+        <span>Not affiliated with Chess.com or Google.</span>
+      </div>
+
+      <span class="footer-wordmark" aria-hidden="true">chesy</span>
+
+    </div>
+  </footer>
+
+  <script src="particles.js" defer></script>
+  <script src="animations.js" defer></script>
+</body>
+
+</html>
