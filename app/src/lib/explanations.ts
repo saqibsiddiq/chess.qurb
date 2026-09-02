@@ -1,6 +1,46 @@
 import { Chess, type Color, type PieceSymbol, type Square } from 'chess.js';
 import type { AnalysisResult, Classification } from './analysis';
 import type { ParsedMove } from './parsePgn';
+import {
+  allowedMateDetails,
+  allowedMateSummaries,
+  backRankConsequences,
+  backRankDetails,
+  backRankOpeners,
+  bestDetails,
+  bestSummaries,
+  bookDetails,
+  bookSummaries,
+  brilliantDetails,
+  brilliantSummaries,
+  checkmateDetails,
+  checkmateSummaries,
+  discoveredConsequences,
+  discoveredDetails,
+  discoveredOpeners,
+  fallbackDetails,
+  fallbackSummaries,
+  forkConsequences,
+  forkDetails,
+  forkOpeners,
+  greatDetails,
+  greatSummaries,
+  hangingConsequences,
+  hangingDetails,
+  hangingOpeners,
+  hangingSummariesNoAttacker,
+  missedMateDetails,
+  missedMateSummaries,
+  pickVariant,
+  pinConsequences,
+  pinDetails,
+  pinOpeners,
+  skewerConsequences,
+  skewerDetails,
+  skewerOpeners,
+  solidDetails,
+  solidSummaries,
+} from './explanationVariants';
 
 export interface BoardShape {
   orig: string;
@@ -31,7 +71,9 @@ export interface MoveExplanation {
   shapes: BoardShape[];
 }
 
-const PIECE_NAMES: Record<PieceSymbol, string> = {
+// Exported so practice mode names the attacking piece with the same
+// vocabulary the review uses.
+export const PIECE_NAMES: Record<PieceSymbol, string> = {
   p: 'pawn',
   n: 'knight',
   b: 'bishop',
@@ -86,6 +128,37 @@ export function pvToSan(fen: string, pv: string[]): string[] {
 
 function formatLoss(lossCp: number): string {
   return (lossCp / 100).toFixed(2);
+}
+
+// Uniquely (and stably) identifies one ply, for seeding pickVariant() —
+// the same move always gets the same phrasing on repeat views; only
+// different moves land on different wording.
+function moveSeed(move: ParsedMove, tag: string): string {
+  return `${move.color}${move.moveNumber}:${move.uci}:${tag}`;
+}
+
+// Joins two independently-picked, independently-complete sentences into
+// one summary — see explanationVariants.ts for why composing two small
+// pools this way covers far more combinations than one large flat pool.
+function compose(opener: string, consequence: string): string {
+  return `${opener} ${consequence}`;
+}
+
+// Plain-language framing for the generic positional-loss case, so the
+// headline sentence reads like a coach talking, not a data readout — the
+// precise pawn figure is still shown, just as supporting detail rather
+// than the main point.
+function severityWord(classification: Classification): string {
+  switch (classification) {
+    case 'mistake':
+      return 'a real mistake';
+    case 'blunder':
+      return 'a costly blunder';
+    case 'miss':
+      return 'a missed opportunity';
+    default:
+      return 'a small slip';
+  }
 }
 
 function squareToCoords(sq: Square): [number, number] {
@@ -399,8 +472,8 @@ export function detectMissedTactic(
     return {
       motif: 'missed_mate',
       title: 'Missed mate',
-      summary: `Forced mate was available with ${bestSan}.`,
-      detail: `You played ${move.san} instead, allowing the opponent an escape window.`,
+      summary: pickVariant(moveSeed(move, 'missed_mate:summary'), missedMateSummaries)(bestSan),
+      detail: pickVariant(moveSeed(move, 'missed_mate:detail'), missedMateDetails)(move.san),
       shapes: [],
     };
   }
@@ -418,8 +491,11 @@ export function detectMissedTactic(
       return {
         motif: 'fork',
         title: 'Missed fork',
-        summary: `The engine's move ${bestSan} forks ${targetNames}.`,
-        detail: `${move.san} was played instead, letting both targets remain safe.`,
+        summary: compose(
+          pickVariant(moveSeed(move, 'fork:opener'), forkOpeners)({ bestSan, targetNames }),
+          pickVariant(moveSeed(move, 'fork:consequence'), forkConsequences),
+        ),
+        detail: pickVariant(moveSeed(move, 'fork:detail'), forkDetails)(move.san),
         motifDetail: { targets: fork.targets },
         shapes: fork.targets.map((t) => ({ orig: bestMove.to, dest: t.square, brush: 'yellow' as const })),
       };
@@ -430,8 +506,11 @@ export function detectMissedTactic(
       return {
         motif: 'pin',
         title: 'Missed pin',
-        summary: `The engine's move ${bestSan} pins the ${pin.frontPiece} on ${pin.frontSquare} to the ${pin.behindPiece} on ${pin.behindSquare}.`,
-        detail: `${move.san} was played instead, letting the ${pin.frontPiece} move freely.`,
+        summary: compose(
+          pickVariant(moveSeed(move, 'pin:opener'), pinOpeners)({ bestSan, frontPiece: pin.frontPiece }),
+          pickVariant(moveSeed(move, 'pin:consequence'), pinConsequences)(pin.behindPiece),
+        ),
+        detail: pickVariant(moveSeed(move, 'pin:detail'), pinDetails)({ san: move.san, frontPiece: pin.frontPiece }),
         motifDetail: { piece: pin.frontPiece, target: pin.behindPiece },
         shapes: [
           { orig: pin.attackerSquare, dest: pin.frontSquare, brush: 'yellow' },
@@ -443,8 +522,15 @@ export function detectMissedTactic(
       return {
         motif: 'skewer',
         title: 'Missed skewer',
-        summary: `The engine's move ${bestSan} skewers the ${pin.frontPiece}, winning the ${pin.behindPiece} behind it.`,
-        detail: `${move.san} was played instead, leaving both pieces safe.`,
+        summary: compose(
+          pickVariant(moveSeed(move, 'skewer:opener'), skewerOpeners)({
+            bestSan,
+            frontPiece: pin.frontPiece,
+            behindPiece: pin.behindPiece,
+          }),
+          pickVariant(moveSeed(move, 'skewer:consequence'), skewerConsequences)(pin.behindPiece),
+        ),
+        detail: pickVariant(moveSeed(move, 'skewer:detail'), skewerDetails)(move.san),
         motifDetail: { front: pin.frontPiece, behind: pin.behindPiece },
         shapes: [
           { orig: pin.attackerSquare, dest: pin.frontSquare, brush: 'yellow' },
@@ -488,8 +574,8 @@ export function explainMove(
     const parsed = moveFromUci(move.uci);
     return {
       title: 'Checkmate',
-      summary: `${move.san} delivers immediate checkmate.`,
-      detail: 'A decisive conclusion to the game.',
+      summary: pickVariant(moveSeed(move, 'mate:summary'), checkmateSummaries)(move.san),
+      detail: pickVariant(moveSeed(move, 'mate:detail'), checkmateDetails),
       motif: 'mate',
       shapes: parsed ? [{ orig: parsed.to, brush: 'yellow' }] : [],
     };
@@ -516,8 +602,8 @@ export function explainMove(
     const parsed = moveFromUci(move.uci);
     return {
       title: 'Allowed mate',
-      summary: `${move.san} allows the opponent a forced checkmate sequence.`,
-      detail: `The best defense was ${bestSan} to prevent the mating attack.`,
+      summary: pickVariant(moveSeed(move, 'allowed_mate:summary'), allowedMateSummaries)(move.san),
+      detail: pickVariant(moveSeed(move, 'allowed_mate:detail'), allowedMateDetails)(bestSan),
       motif: 'allowed_mate',
       // Where the danger came from, plus the defense that avoided it.
       shapes: [...(parsed ? [{ orig: parsed.to, brush: 'red' as const }] : []), ...bestMoveArrow],
@@ -537,10 +623,30 @@ export function explainMove(
     if (hanging.attackerSquare) {
       hangingShapes.push({ orig: hanging.attackerSquare, dest: hanging.square, brush: 'red' });
     }
+    // Naming the actual attacker (not just "vulnerable") is the concrete,
+    // checkable reason a piece is hanging — a player can go verify it on
+    // the board immediately, rather than taking the label on faith.
+    const attackerPiece = hanging.attackerSquare ? afterBoard.get(hanging.attackerSquare) : null;
+    const attackerName = attackerPiece ? PIECE_NAMES[attackerPiece.type] : null;
     return {
       title: 'Hanging piece',
-      summary: `Your ${hanging.name} on ${hanging.square} is now under-defended and vulnerable.`,
-      detail: `Played ${move.san} (loss: ~${lossText} pawns). The engine preferred ${bestSan} to maintain piece safety.`,
+      summary:
+        attackerName && hanging.attackerSquare
+          ? compose(
+              pickVariant(moveSeed(move, 'hanging:opener'), hangingOpeners)({
+                pieceName: hanging.name,
+                square: hanging.square,
+              }),
+              pickVariant(moveSeed(move, 'hanging:consequence'), hangingConsequences)({
+                attackerName,
+                attackerSquare: hanging.attackerSquare,
+              }),
+            )
+          : pickVariant(moveSeed(move, 'hanging:summary'), hangingSummariesNoAttacker)({
+              pieceName: hanging.name,
+              square: hanging.square,
+            }),
+      detail: pickVariant(moveSeed(move, 'hanging:detail'), hangingDetails)({ bestSan, lossText }),
       motif: 'hanging_piece',
       motifDetail: { piece: hanging.name, square: hanging.square },
       // What's hanging and to whom, plus what avoids it — two arrows
@@ -581,10 +687,23 @@ export function explainMove(
     // 7. Discovered Attack
     const discovered = detectDiscoveredAttack(beforeBoard, afterBoard, playedMove, move.color === 'w' ? 'b' : 'w');
     if (discovered) {
+      // Naming the actual attacking piece (bishop/rook/queen) instead of a
+      // generic "slider" label — a player can look at the board and see
+      // exactly which piece is doing the attacking.
+      const attackerPiece = afterBoard.get(discovered.attackerSquare);
+      const attackerName = attackerPiece ? PIECE_NAMES[attackerPiece.type] : 'piece';
       return {
         title: 'Discovered attack',
-        summary: `A line has been opened against your ${discovered.targetPiece} on ${discovered.targetSquare}.`,
-        detail: `The enemy slider gained direct sight of your piece after ${move.san}.`,
+        summary: compose(
+          pickVariant(moveSeed(move, 'discovered:opener'), discoveredOpeners)(move.san),
+          pickVariant(moveSeed(move, 'discovered:consequence'), discoveredConsequences)({
+            attackerName,
+            attackerSquare: discovered.attackerSquare,
+            targetPiece: discovered.targetPiece,
+            targetSquare: discovered.targetSquare,
+          }),
+        ),
+        detail: pickVariant(moveSeed(move, 'discovered:detail'), discoveredDetails),
         motif: 'discovered_attack',
         motifDetail: { target: discovered.targetPiece, square: discovered.targetSquare },
         shapes: [{ orig: discovered.attackerSquare, dest: discovered.targetSquare, brush: 'red' }],
@@ -596,8 +715,11 @@ export function explainMove(
     if (backRank) {
       return {
         title: 'Back-rank vulnerability',
-        summary: `The king on ${backRank.kingSquare} has limited escape mobility on the back rank.`,
-        detail: `A back-rank mate threat was created or intensified following ${move.san}.`,
+        summary: compose(
+          pickVariant(moveSeed(move, 'back_rank:opener'), backRankOpeners)(backRank.kingSquare),
+          pickVariant(moveSeed(move, 'back_rank:consequence'), backRankConsequences),
+        ),
+        detail: pickVariant(moveSeed(move, 'back_rank:detail'), backRankDetails)(move.san),
         motif: 'back_rank',
         motifDetail: { kingSquare: backRank.kingSquare },
         shapes: [{ orig: backRank.kingSquare, brush: 'red' }],
@@ -613,8 +735,8 @@ export function explainMove(
   if (classification === 'brilliant') {
     return {
       title: 'Brilliant!!',
-      summary: `${move.san} is a sound sacrifice that's hard to find.`,
-      detail: `The engine confirms ${move.san} holds the advantage despite giving up material.`,
+      summary: pickVariant(moveSeed(move, 'brilliant:summary'), brilliantSummaries)(move.san),
+      detail: pickVariant(moveSeed(move, 'brilliant:detail'), brilliantDetails),
       motif: 'positive',
       shapes: positiveShapes,
     };
@@ -622,8 +744,8 @@ export function explainMove(
   if (classification === 'great') {
     return {
       title: 'Great move!',
-      summary: `${move.san} was the only move that kept the position together.`,
-      detail: `Any other reasonable try here loses significant ground.`,
+      summary: pickVariant(moveSeed(move, 'great:summary'), greatSummaries)(move.san),
+      detail: pickVariant(moveSeed(move, 'great:detail'), greatDetails),
       motif: 'positive',
       shapes: positiveShapes,
     };
@@ -631,17 +753,26 @@ export function explainMove(
   if (classification === 'book') {
     return {
       title: 'Book move',
-      summary: `${move.san} follows known opening theory.`,
-      detail: `Common in games at this stage of the opening.`,
+      summary: pickVariant(moveSeed(move, 'book:summary'), bookSummaries)(move.san),
+      detail: pickVariant(moveSeed(move, 'book:detail'), bookDetails),
       motif: 'positive',
       shapes: positiveShapes,
     };
   }
-  if (classification === 'best' || classification === 'excellent' || classification === 'good') {
+  if (classification === 'best') {
     return {
-      title: classification === 'best' ? 'Best move' : 'Solid continuation',
-      summary: `${move.san} keeps the position balanced and active.`,
-      detail: `The engine's top choice was ${bestSan}.`,
+      title: 'Best move',
+      summary: pickVariant(moveSeed(move, 'best:summary'), bestSummaries)(move.san),
+      detail: pickVariant(moveSeed(move, 'best:detail'), bestDetails),
+      motif: 'positive',
+      shapes: positiveShapes,
+    };
+  }
+  if (classification === 'excellent' || classification === 'good') {
+    return {
+      title: 'Solid continuation',
+      summary: pickVariant(moveSeed(move, 'solid:summary'), solidSummaries)(move.san),
+      detail: pickVariant(moveSeed(move, 'solid:detail'), solidDetails)({ san: move.san, bestSan }),
       motif: 'positive',
       shapes: positiveShapes,
     };
@@ -650,8 +781,11 @@ export function explainMove(
   // 10. General positional loss
   return {
     title: 'Evaluation shifted',
-    summary: `No single tactical blunder detected; positional balance shifted by ~${lossText} pawns.`,
-    detail: `The engine favored ${bestSan} to maintain optimal piece activity.`,
+    summary: pickVariant(moveSeed(move, 'fallback:summary'), fallbackSummaries)({
+      san: move.san,
+      severity: severityWord(classification),
+    }),
+    detail: pickVariant(moveSeed(move, 'fallback:detail'), fallbackDetails)({ bestSan, lossText }),
     motif: 'evaluation',
     shapes: bestMoveArrow,
   };

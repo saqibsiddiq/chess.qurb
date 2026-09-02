@@ -14,6 +14,32 @@ export interface RemoteGameSummary {
 
 class GameImportError extends Error {}
 
+// No fetch here had a timeout, so a stalled request on a flaky mobile
+// connection left the Connect panel spinning forever with no way out.
+// (The same class of bug once cost this project a 3.5-hour overnight run
+// against an SDK whose client had no default timeout.) Every request
+// below goes through this wrapper.
+const REQUEST_TIMEOUT_MS = 12_000;
+
+async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  // AbortSignal.any combines our timeout with any caller-supplied signal
+  // (a cancel button), so whichever fires first aborts the request.
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+  return fetch(url, { ...init, signal });
+}
+
+/// Distinguishes "we gave up waiting" from "the network is unreachable",
+/// so the user gets an error that suggests the right next action.
+function networkError(err: unknown, service: string): GameImportError {
+  const timedOut = err instanceof DOMException && err.name === 'TimeoutError';
+  return new GameImportError(
+    timedOut
+      ? `${service} took too long to respond. Check your connection and try again.`
+      : `Could not reach ${service}. Check your connection and try again.`,
+  );
+}
+
 function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
@@ -55,9 +81,9 @@ export async function fetchLichessGames(username: string, max = 20): Promise<Rem
   const url = `https://lichess.org/api/games/user/${encodeURIComponent(trimmed)}?max=${max}&pgnInJson=true&opening=false`;
   let res: Response;
   try {
-    res = await fetch(url, { headers: { Accept: 'application/x-ndjson' } });
-  } catch {
-    throw new GameImportError('Could not reach Lichess. Check your connection and try again.');
+    res = await fetchWithTimeout(url, { headers: { Accept: 'application/x-ndjson' } });
+  } catch (err) {
+    throw networkError(err, 'Lichess');
   }
 
   if (res.status === 404) throw new GameImportError(`No Lichess account found for "${trimmed}".`);
@@ -113,9 +139,9 @@ export async function fetchChessComGames(username: string, max = 20): Promise<Re
 
   let archivesRes: Response;
   try {
-    archivesRes = await fetch(`https://api.chess.com/pub/player/${handle}/games/archives`);
-  } catch {
-    throw new GameImportError('Could not reach Chess.com. Check your connection and try again.');
+    archivesRes = await fetchWithTimeout(`https://api.chess.com/pub/player/${handle}/games/archives`);
+  } catch (err) {
+    throw networkError(err, 'Chess.com');
   }
   if (archivesRes.status === 404) throw new GameImportError(`No Chess.com account found for "${trimmed}".`);
   if (!archivesRes.ok) throw new GameImportError(`Chess.com request failed (${archivesRes.status}).`);
@@ -126,29 +152,53 @@ export async function fetchChessComGames(username: string, max = 20): Promise<Re
   const games: RemoteGameSummary[] = [];
   // Archives are chronological (oldest first) — walk backwards from the
   // most recent month so users see their latest games, not their oldest.
-  for (let i = archives.length - 1; i >= 0 && games.length < max; i--) {
-    let monthRes: Response;
-    try {
-      monthRes = await fetch(archives[i]);
-    } catch {
-      continue;
-    }
-    if (!monthRes.ok) continue;
-    const { games: monthGames } = (await monthRes.json()) as { games: ChessComGame[] };
-    for (let j = monthGames.length - 1; j >= 0 && games.length < max; j--) {
-      const g = monthGames[j];
-      if (!g.pgn) continue;
-      games.push({
-        id: g.uuid ?? g.url,
-        white: g.white?.username ?? 'Unknown',
-        black: g.black?.username ?? 'Unknown',
-        whiteRating: g.white?.rating ?? null,
-        blackRating: g.black?.rating ?? null,
-        result: chessComResult(g),
-        date: formatDate(g.end_time * 1000),
-        timeControl: g.time_class ?? null,
-        pgn: g.pgn,
-      });
+  //
+  // The first month is fetched on its own, and only if that didn't yield
+  // enough games do later months get fetched several at a time. Going
+  // straight to parallel batches would speed up a sparse account (which
+  // otherwise pays one full round trip per thin month) at the cost of
+  // making an active player — whose latest month alone covers `max` —
+  // download two months of history they'll never see. Widening only
+  // after a miss gets the latency win without that waste.
+  let batchSize = 1;
+  for (let i = archives.length - 1; i >= 0 && games.length < max; i -= batchSize, batchSize = 3) {
+    const batch: string[] = [];
+    for (let k = i; k > i - batchSize && k >= 0; k--) batch.push(archives[k]);
+
+    // A failed month is skipped, not fatal — one bad archive shouldn't
+    // lose the games we did manage to fetch alongside it.
+    const responses = await Promise.all(
+      batch.map(async (url) => {
+        try {
+          const res = await fetchWithTimeout(url);
+          if (!res.ok) return null;
+          return (await res.json()) as { games: ChessComGame[] };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    // Iterated in batch order (newest month first) so the newest-first
+    // ordering the loop above establishes survives the parallel fetch.
+    for (const payload of responses) {
+      if (!payload?.games) continue;
+      for (let j = payload.games.length - 1; j >= 0 && games.length < max; j--) {
+        const g = payload.games[j];
+        if (!g.pgn) continue;
+        games.push({
+          id: g.uuid ?? g.url,
+          white: g.white?.username ?? 'Unknown',
+          black: g.black?.username ?? 'Unknown',
+          whiteRating: g.white?.rating ?? null,
+          blackRating: g.black?.rating ?? null,
+          result: chessComResult(g),
+          date: formatDate(g.end_time * 1000),
+          timeControl: g.time_class ?? null,
+          pgn: g.pgn,
+        });
+      }
+      if (games.length >= max) break;
     }
   }
 

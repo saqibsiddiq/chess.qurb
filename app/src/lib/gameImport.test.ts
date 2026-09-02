@@ -90,4 +90,72 @@ describe('fetchChessComGames', () => {
     globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 } as Response);
     await expect(fetchChessComGames('nobody')).rejects.toThrow('No Chess.com account found');
   });
+
+  test('widens to a parallel batch when the newest month is too thin', async () => {
+    // Four months of archives; the newest is empty, so one month is not
+    // enough and the fetcher has to reach further back.
+    const archives = { archives: ['…/2023/11', '…/2023/12', '…/2024/01', '…/2024/02'] };
+    const emptyMonth = { games: [] };
+    const gameIn = (id: string) => ({
+      games: [
+        {
+          url: id,
+          uuid: `${id}-uuid`,
+          end_time: 1706745600,
+          time_class: 'blitz',
+          white: { username: 'alice', rating: 1800, result: 'win' },
+          black: { username: 'bob', rating: 1750, result: 'resigned' },
+          pgn: '1. e4 e5 *',
+        },
+      ],
+    });
+    const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body } as Response);
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(ok(archives))
+      .mockResolvedValueOnce(ok(emptyMonth)) // newest month, fetched alone
+      .mockResolvedValueOnce(ok(gameIn('jan')))
+      .mockResolvedValueOnce(ok(emptyMonth))
+      .mockResolvedValueOnce(ok(emptyMonth));
+
+    const games = await fetchChessComGames('alice', 1);
+
+    expect(games).toHaveLength(1);
+    expect(games[0]).toMatchObject({ id: 'jan-uuid' });
+    // 1 archives + 1 lone newest month + a 3-wide batch for the rest.
+    // The point is that those three went out together rather than
+    // costing three separate sequential round trips.
+    expect(globalThis.fetch).toHaveBeenCalledTimes(5);
+  });
+
+  test('a month that fails is skipped without losing its batch-mates', async () => {
+    const archives = { archives: ['…/2023/12', '…/2024/01', '…/2024/02'] };
+    const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body } as Response);
+
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(ok(archives))
+      .mockResolvedValueOnce(ok({ games: [] })) // newest month, empty
+      .mockRejectedValueOnce(new Error('network blip')) // Jan fails outright
+      .mockResolvedValueOnce(
+        ok({
+          games: [
+            {
+              url: 'dec',
+              uuid: 'dec-uuid',
+              end_time: 1706745600,
+              time_class: 'rapid',
+              white: { username: 'alice', rating: 1800, result: 'win' },
+              black: { username: 'bob', rating: 1750, result: 'resigned' },
+              pgn: '1. d4 d5 *',
+            },
+          ],
+        }),
+      );
+
+    const games = await fetchChessComGames('alice', 5);
+    expect(games).toHaveLength(1);
+    expect(games[0]).toMatchObject({ id: 'dec-uuid' });
+  });
 });

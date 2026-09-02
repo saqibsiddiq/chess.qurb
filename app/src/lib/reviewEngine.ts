@@ -1,8 +1,15 @@
 import { Chess } from 'chess.js';
 import type { AnalysisResult, Classification } from './analysis';
 import type { ParsedGame, ParsedMove } from './parsePgn';
-import { detectMissedTactic, detectNewlyHangingPiece, explainMove, type MoveExplanation } from './explanations';
+import {
+  detectMissedTactic,
+  detectNewlyHangingPiece,
+  explainMove,
+  uciToSan,
+  type MoveExplanation,
+} from './explanations';
 import { isBookMove } from './openingBook';
+import { buildMoveFacts, type MoveFacts } from './slm';
 
 export type { Classification };
 
@@ -12,6 +19,7 @@ export interface ReviewedMove extends ParsedMove {
   evalAfter: { cp: number | null; mate: number | null };
   bestMoveUci: string;
   explanation: MoveExplanation;
+  slmFacts: MoveFacts;
 }
 
 export interface GameReview {
@@ -31,7 +39,11 @@ const NONTRIVIAL_WP_HIGH = 97;
 const BRILLIANT_MIN_SACRIFICE = 2; // pawn-equivalent units; admits an exchange sac (5-3)
 const BRILLIANT_MIN_WP_AFTER = 60;
 
-function toCpValue(cp: number | null, mate: number | null, isWhiteTurn = true): number {
+// Exported so practice mode scores an attempted move with exactly the
+// same arithmetic the review uses — a "you lost 1.4 pawns" in practice
+// must mean the same thing as it does in the review, or the two features
+// quietly disagree about the same position.
+export function toCpValue(cp: number | null, mate: number | null, isWhiteTurn = true): number {
   if (mate !== null) {
     if (mate === 0) {
       // Terminal checkmate: if it's black's turn and black is mated, White won (+MATE_SCORE)
@@ -246,22 +258,36 @@ export function reviewMove(
     missedTacticMotif: missedTactic?.motif ?? null,
   });
 
+  const explanation = explainMove(
+    move,
+    fenBefore,
+    before,
+    lossCp,
+    classification,
+    isCheckmate ? 0 : after.evalMate,
+    missedTactic,
+  );
+  const evalAfter = isCheckmate
+    ? { cp: null, mate: move.color === 'w' ? 1 : -1 }
+    : { cp: after.evalCp, mate: after.evalMate };
+
   const reviewedMove: ReviewedMove = {
     ...move,
     classification,
     lossCp,
-    evalAfter: isCheckmate
-      ? { cp: null, mate: move.color === 'w' ? 1 : -1 }
-      : { cp: after.evalCp, mate: after.evalMate },
+    evalAfter,
     bestMoveUci: before.bestMove,
-    explanation: explainMove(
+    explanation,
+    slmFacts: buildMoveFacts(
       move,
       fenBefore,
       before,
+      uciToSan(fenBefore, before.bestMove),
       lossCp,
       classification,
-      isCheckmate ? 0 : after.evalMate,
-      missedTactic,
+      evalAfter.cp,
+      evalAfter.mate,
+      explanation,
     ),
   };
 

@@ -1,114 +1,237 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import type { AnalysisResult } from '../lib/analysis.ts';
 import type { Classification } from '../lib/reviewEngine.ts';
 import type { MoveExplanation, TacticalMotif } from '../lib/explanations';
 import { pvToSan, uciToSan } from '../lib/explanations';
+import type { SlmState } from '../lib/slm.ts';
+import { VERDICT_COPY, type PracticeAttempt } from '../lib/practice';
+
+/** The live drill, when one is running. */
+export interface PracticeView {
+  attempts: PracticeAttempt[];
+  status: 'awaiting' | 'judging' | 'revealed';
+  error?: string;
+}
 
 interface EnginePanelProps {
   fen: string;
   analysis: AnalysisResult | null;
   classification?: Classification;
   explanation?: MoveExplanation;
+  slmState?: SlmState;
+  // Present only when a deep dive can be requested for the current move
+  // (i.e. review has classified it); undefined hides the button entirely
+  // rather than showing a disabled one.
+  onRequestDeepDive?: () => void;
   loading?: boolean;
   progressPercent?: number | null;
+  /* Practice lives inside this card rather than below it. Appending a
+     block pushed the explanation, the engine lines and the move list
+     down the moment the button appeared; swapping the card's body keeps
+     the layout still whether a drill is running or not. */
+  practice?: PracticeView | null;
+  canPractice?: boolean;
+  practiceBestSan?: string;
+  onStartPractice?: () => void;
+  onRevealPractice?: () => void;
+  onExitPractice?: () => void;
 }
 
 const MOTIF_LABELS: Partial<Record<TacticalMotif, string>> = {
   fork: 'Fork',
   pin: 'Pin',
   skewer: 'Skewer',
-  discovered_attack: 'Discovered Attack',
-  hanging_piece: 'Hanging Piece',
-  missed_mate: 'Missed Mate',
-  allowed_mate: 'Allowed Mate',
-  back_rank: 'Back Rank Threat',
+  discovered_attack: 'Discovered attack',
+  hanging_piece: 'Hanging piece',
+  missed_mate: 'Missed mate',
+  allowed_mate: 'Allowed mate',
+  back_rank: 'Back rank threat',
   mate: 'Checkmate',
 };
 
-function evalToPercent(evalCp: number | null, evalMate: number | null): number {
-  if (evalMate !== null) return evalMate > 0 ? 100 : 0;
-  if (evalCp === null) return 50;
-  const capped = Math.max(-1000, Math.min(1000, evalCp));
-  return 50 + (capped / 1000) * 50;
-}
+const CLASSIFICATION_LABELS: Record<Classification, string> = {
+  brilliant: 'Brilliant',
+  great: 'Great',
+  best: 'Best',
+  excellent: 'Excellent',
+  good: 'Good',
+  book: 'Book',
+  inaccuracy: 'Inaccuracy',
+  mistake: 'Mistake',
+  miss: 'Miss',
+  blunder: 'Blunder',
+};
 
 function formatEval(evalCp: number | null, evalMate: number | null): string {
-  if (evalMate !== null) return `Mate in ${Math.abs(evalMate)}`;
+  if (evalMate !== null) return `M${Math.abs(evalMate)}`;
   if (evalCp === null) return '—';
   const pawns = (evalCp / 100).toFixed(2);
   return evalCp > 0 ? `+${pawns}` : pawns;
 }
 
-export default function EnginePanel({
+function EnginePanel({
   fen,
   analysis,
   classification,
   explanation,
+  slmState,
+  onRequestDeepDive,
   loading = false,
   progressPercent = null,
+  practice = null,
+  canPractice = false,
+  practiceBestSan = '',
+  onStartPractice,
+  onRevealPractice,
+  onExitPractice,
 }: EnginePanelProps) {
-  const percent = evalToPercent(analysis?.evalCp ?? null, analysis?.evalMate ?? null);
   const motifLabel = explanation?.motif ? MOTIF_LABELS[explanation.motif] : undefined;
 
   const bestSan = useMemo(() => {
     return analysis && analysis.bestMove ? uciToSan(fen, analysis.bestMove) : '—';
   }, [fen, analysis?.bestMove]);
 
+  // Newest attempt only — see the comment on the practice block below.
+  const last = practice && practice.attempts.length > 0
+    ? practice.attempts[practice.attempts.length - 1]
+    : null;
+
   const pvSan = useMemo(() => {
     return analysis && analysis.pv.length > 0 ? pvToSan(fen, analysis.pv.slice(0, 8)).join(' ') : '';
   }, [fen, analysis?.pv]);
 
   return (
-    <div className="engine-panel">
-      <div className="eval-bar">
-        <div className="eval-bar-white" style={{ height: `${percent}%` }} />
-      </div>
-      <div className="engine-details">
-        <div className="badge-row">
-          {classification && (
-            <div className={`classification-badge classification-${classification}`}>
-              {classification.toUpperCase()}
-            </div>
-          )}
-          {motifLabel && (
-            <div className="motif-badge">
-              {motifLabel.toUpperCase()}
-            </div>
-          )}
+    <div className="insight">
+      <div className="insight-top">
+        <div className={`insight-eval${loading && !analysis ? ' is-waiting' : ''}`}>
+          {loading && !analysis
+            ? `Analysing${progressPercent !== null ? ` · ${progressPercent}%` : '…'}`
+            : formatEval(analysis?.evalCp ?? null, analysis?.evalMate ?? null)}
         </div>
 
-        <div className="engine-eval">
-          {loading && !analysis ? (
-            <span className="eval-analyzing">
-              Analyzing… {progressPercent !== null ? `(${progressPercent}%)` : ''}
-            </span>
+        {(classification || motifLabel) && (
+          <div className="insight-badges">
+            {classification && (
+              <span className={`badge badge-${classification}`}>
+                {CLASSIFICATION_LABELS[classification]}
+              </span>
+            )}
+            {motifLabel && <span className="badge badge-motif">{motifLabel}</span>}
+          </div>
+        )}
+      </div>
+
+      {explanation && !practice && (
+        <div className="insight-block insight-body" key={explanation.title + explanation.summary}>
+          <div className="insight-kicker">
+            <span>Why this matters</span>
+            {canPractice && onStartPractice ? (
+              <button type="button" className="kicker-action" onClick={onStartPractice}>
+                Try it yourself
+              </button>
+            ) : (
+              explanation.shapes.length > 0 && <span>Arrows on board</span>
+            )}
+          </div>
+          <div className="insight-title">{explanation.title}</div>
+          <p className="insight-summary">{explanation.summary}</p>
+          <p className="insight-detail">{explanation.detail}</p>
+        </div>
+      )}
+
+      {practice && (
+        <div className="insight-block insight-body">
+          <div className="insight-kicker">
+            <span>Your move</span>
+            <button type="button" className="kicker-action" onClick={onExitPractice}>
+              Done
+            </button>
+          </div>
+
+          {last ? (
+            <>
+              <div className={`insight-title practice-line ${VERDICT_COPY[last.verdict].tone}`}>
+                <span>{last.san}</span>
+                <span className="practice-title-verdict">{VERDICT_COPY[last.verdict].title}</span>
+                {last.lossCp > 0 && (
+                  <span className="practice-title-loss num">−{(last.lossCp / 100).toFixed(2)}</span>
+                )}
+              </div>
+              {/* Only the newest attempt is shown. Listing every try grew
+                  the card on each move and pushed everything below it. */}
+              <p className="insight-summary">
+                {last.reason ?? (last.verdict === 'best'
+                  ? 'That is the move the engine plays here.'
+                  : 'A reasonable try — the engine still prefers its own move.')}
+              </p>
+            </>
           ) : (
-            formatEval(analysis?.evalCp ?? null, analysis?.evalMate ?? null)
+            <>
+              <div className="insight-title">Play the move you think is best</div>
+              <p className="insight-summary">
+                {practice.status === 'judging' ? 'Checking…' : 'The board is live — drag a piece.'}
+              </p>
+            </>
+          )}
+
+          <p className="insight-detail">
+            {practice.status === 'revealed'
+              ? `The engine played ${practiceBestSan}.`
+              : practice.error ??
+                (practice.attempts.length > 1
+                  ? `${practice.attempts.length} attempts so far.`
+                  : 'Keep trying, or reveal the answer.')}
+          </p>
+
+          {practice.status !== 'revealed' && practice.attempts.length > 0 && onRevealPractice && (
+            <button type="button" className="kicker-action practice-reveal-inline" onClick={onRevealPractice}>
+              Show the answer
+            </button>
           )}
         </div>
+      )}
 
-        {explanation && (
-          <div className="move-explanation">
-            <div className="explanation-kicker">
-              <span>Why this move matters</span>
-              {explanation.shapes.length > 0 && <span className="arrow-indicator">✦ Tactical overlays active</span>}
-            </div>
-            <div className="explanation-title">{explanation.title}</div>
-            <p className="explanation-summary">{explanation.summary}</p>
-            <p className="explanation-detail">{explanation.detail}</p>
+      {onRequestDeepDive && !slmState && (
+        <button type="button" className="deep-dive-btn" onClick={onRequestDeepDive}>
+          Explain in depth (experimental)
+        </button>
+      )}
+
+      {slmState && (
+        <div className="insight-block">
+          <div className="insight-kicker">
+            <span>AI explanation</span>
+            {slmState.status === 'done' && slmState.elapsedMs !== undefined && (
+              <span>{slmState.elapsedMs}ms</span>
+            )}
           </div>
-        )}
-
-        <div className="engine-meta-row">
-          <div className="engine-depth">Depth {analysis?.depth ?? '—'}</div>
-          <div className="engine-best">Best: <strong>{bestSan}</strong></div>
+          {slmState.status === 'loading' && <p className="insight-summary">Generating…</p>}
+          {slmState.status === 'unavailable' && (
+            <p className="insight-summary">Not bundled in this build.</p>
+          )}
+          {slmState.status === 'error' && (
+            <p className="insight-summary">Generation failed: {slmState.error}</p>
+          )}
+          {slmState.status === 'done' && (
+            <>
+              <p className="insight-summary">{slmState.text}</p>
+              {slmState.warning && (
+                <p className="insight-detail insight-warning">{slmState.warning}</p>
+              )}
+            </>
+          )}
         </div>
-        {pvSan && (
-          <div className="engine-pv" title={pvSan}>
-            PV: {pvSan}
-          </div>
-        )}
+      )}
+
+      <div className="insight-meta">
+        <span>Depth {analysis?.depth ?? '—'}</span>
+        <span>Best <strong>{bestSan}</strong></span>
       </div>
+      {pvSan && <div className="insight-pv" title={pvSan}>{pvSan}</div>}
     </div>
   );
 }
+
+// Only meaningful because App passes a stable `onRequestDeepDive` — an
+// inline arrow there would change identity every render and defeat this.
+export default memo(EnginePanel);

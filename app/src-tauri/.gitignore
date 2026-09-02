@@ -10,3 +10,8 @@
 # See binaries/README.md for how to populate this before building.
 /binaries/*
 !/binaries/README.md
+
+# Bundled SLM GGUF weights — too large for git, regenerable via
+# ml/training/ + the GGUF conversion steps in models/README.md.
+/models/*
+!/models/README.md

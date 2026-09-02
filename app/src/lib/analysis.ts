@@ -5,8 +5,9 @@ export interface AnalysisResult {
   pv: string[];
   depth: number;
   // Second-best line from a MultiPV=2 search, used to detect "only good move"
-  // (Great) and sacrifice (Brilliant) situations. Only populated by
-  // analyze_game(); analyze_position()/check_engine() leave these null.
+  // (Great) and sacrifice (Brilliant) situations. Only populated when
+  // analyze_game() runs in Deep mode; Fast mode (MultiPV=1) leaves these
+  // null, which is why it can't produce Great/Brilliant classifications.
   secondMove: string | null;
   secondEvalCp: number | null;
   secondEvalMate: number | null;
@@ -34,8 +35,23 @@ export interface EngineInfo {
   error: string | null;
 }
 
+// Every review event carries the id of the run that emitted it. Listeners
+// must drop events whose runId isn't the current run — see
+// src-tauri/src/lib.rs's ReviewProgress for why (a stale run's events
+// would otherwise be attributed to, and prematurely complete, the run
+// that superseded it).
 export interface ReviewProgressPayload {
+  runId: number;
   index: number;
   total: number;
   result: AnalysisResult;
+}
+
+export interface ReviewCompletePayload {
+  runId: number;
+}
+
+export interface ReviewErrorPayload {
+  runId: number;
+  message: string;
 }
