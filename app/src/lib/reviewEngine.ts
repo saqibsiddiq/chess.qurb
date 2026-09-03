@@ -54,8 +54,12 @@ export function toCpValue(cp: number | null, mate: number | null, isWhiteTurn = 
   return cp ?? 0;
 }
 
-// Lichess win% formula converting White-relative centipawns to White win probability
-function winPercent(cp: number): number {
+// Lichess win% formula converting White-relative centipawns to White win
+// probability. Exported so turning-point detection ranks swings on the
+// same scale accuracy is scored with — centipawns alone would rate a
+// 3-pawn slip in an already-lost position as highly as one that threw a
+// level game.
+export function winPercent(cp: number): number {
   return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
 }
 

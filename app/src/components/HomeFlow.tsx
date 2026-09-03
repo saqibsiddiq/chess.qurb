@@ -2,12 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { fetchRemoteGames, type RemoteGameSummary, type RemoteProvider } from '../lib/gameImport';
 import type { ReviewSummary } from '../lib/storage';
+import type { LichessAnalysisEntry } from '../lib/lichessAnalysis';
 import { insightsFor } from '../lib/insights';
+import { forgetAccount, loadAccount, saveAccount } from '../lib/account';
+import { TERMINATION_LABELS, type Termination } from '../lib/termination';
+import { openingRecords } from '../lib/openings';
+import { useT } from '../lib/i18n';
+import { accuracyTone, scoreTone, blunderTone } from '../lib/tone';
 import {
-  IconBack,
   IconChevronRight,
   IconFolder,
+  IconChessCom,
   IconGlobe,
+  IconLichess,
   IconLibrary,
   IconPaste,
   IconSearch,
@@ -27,27 +34,36 @@ interface PgnFile {
 }
 
 interface HomeFlowProps {
-  onImport: (pgn: string) => void;
+  /** `analysis`, when the source already has one, lets the review skip
+   *  the local engine entirely. */
+  onImport: (pgn: string, analysis?: LichessAnalysisEntry[]) => void;
   recent: ReviewSummary[];
   onOpenRecent: (id: string) => void;
+  /** Lifts the current step up to the shell so there is one top bar for
+   *  the whole app rather than a second one nested inside this panel.
+   *  `onBack` is null on the first screen, which is what tells the shell
+   *  to show the logo instead of a back button. */
+  onNav?: (nav: {
+    title: string;
+    onBack: (() => void) | null;
+    /** When set, the title names something you can act on — the connected
+     *  account — and the shell renders it as a control rather than a
+     *  label. Keeping it out of the page body is what leaves the whole
+     *  screen for the games. */
+    onTitleTap?: (() => void) | null;
+  }) => void;
 }
 
-type Route = 'root' | 'connect' | 'provider' | 'local' | 'browse' | 'paste' | 'library';
+type Route = 'root' | 'connect' | 'provider' | 'local' | 'browse' | 'paste' | 'library' | 'stats' | 'opening';
 
 const PROVIDER_LABEL: Record<RemoteProvider, string> = {
   lichess: 'Lichess',
   chesscom: 'Chess.com',
 };
 
-const TITLES: Record<Route, string> = {
-  root: '',
-  connect: 'Connect an account',
-  provider: '',
-  local: 'Open a local game',
-  browse: 'PGN files on this device',
-  paste: 'Paste notation',
-  library: 'Games you have reviewed',
-};
+/** Routes with no title of their own: the first screen, and the provider
+ *  screen whose title is the connected account's name. */
+const UNTITLED: ReadonlySet<Route> = new Set(['root', 'provider']);
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -70,10 +86,18 @@ function formatWhen(epochSeconds: number): string {
 /// would be a lie dressed up as data.
 const MIN_GAMES_FOR_INSIGHTS = 3;
 
-export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowProps) {
+export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: HomeFlowProps) {
+  const tr = useT();
   // Derived from the summary index alone, so this costs a pass over a
   // handful of small objects rather than loading any stored game.
   const insights = useMemo(() => insightsFor(recent), [recent]);
+
+  // Grouped from the same summary index the patterns use, so this costs
+  // nothing extra.
+  const openings = useMemo(
+    () => (insights ? openingRecords(recent, insights.player).slice(0, 6) : []),
+    [recent, insights],
+  );
 
   const [route, setRoute] = useState<Route>('root');
   const [provider, setProvider] = useState<RemoteProvider | null>(null);
@@ -82,11 +106,17 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
   const [games, setGames] = useState<RemoteGameSummary[]>([]);
   const [loadingGames, setLoadingGames] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Username we are connected as for the current provider, or null.
+   *  Kept in state rather than read from storage at render time so the
+   *  connected view appears the moment a first sign-in succeeds, not on
+   *  the next visit. */
+  const [connected, setConnected] = useState<string | null>(null);
 
   const [files, setFiles] = useState<PgnFile[] | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
 
+  const [openOpening, setOpenOpening] = useState<string | null>(null);
   const [text, setText] = useState('');
   const pasteRef = useRef<HTMLTextAreaElement>(null);
 
@@ -98,6 +128,8 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
   const back = () => {
     if (route === 'provider') return go('connect');
     if (route === 'browse' || route === 'paste') return go('local');
+    if (route === 'stats') return go('library');
+    if (route === 'opening') return go('stats');
     go('root');
   };
 
@@ -145,38 +177,100 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
     reader.readAsText(file);
   };
 
-  const fetchGames = async () => {
-    if (!provider || !username.trim()) return;
-    setLoadingGames(true);
-    setError(null);
-    try {
-      setGames(await fetchRemoteGames(provider, username.trim()));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoadingGames(false);
+  const fetchGames = useCallback(
+    async (forProvider: RemoteProvider, forUsername: string) => {
+      const name = forUsername.trim();
+      if (!name) return;
+      setLoadingGames(true);
+      setError(null);
+      try {
+        const found = await fetchRemoteGames(forProvider, name);
+        setGames(found);
+        // Only remembered once it actually worked — storing a typo would
+        // make every future visit start with a failing request.
+        saveAccount({ provider: forProvider, username: name });
+        setConnected(name);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setLoadingGames(false);
+      }
+    },
+    [],
+  );
+
+  /** Provider whose games this visit has already asked for. Without it a
+   *  failed request would re-fire the effect the moment `loadingGames`
+   *  went false — games would still be empty, so the condition would hold
+   *  again — and the account would sit in a silent retry loop. */
+  const autoFetched = useRef<RemoteProvider | null>(null);
+
+  // A remembered account skips straight to a refreshed list: the account
+  // doesn't change between visits, only the games do.
+  //
+  // Deliberately not gated on `username` being empty. `openProvider`
+  // fills the username in from storage before switching route, so a
+  // `!username` guard here is false on the very first render and the
+  // fetch never runs at all — which is what made a connected account show
+  // an empty list under a search box.
+  useEffect(() => {
+    if (route !== 'provider' || !provider) return;
+    if (games.length > 0 || loadingGames) return;
+    if (autoFetched.current === provider) return;
+    const saved = loadAccount();
+    if (saved && saved.provider === provider) {
+      autoFetched.current = provider;
+      void fetchGames(provider, saved.username);
     }
+  }, [route, provider, games.length, loadingGames, fetchGames]);
+
+  const openProvider = (next: RemoteProvider) => {
+    const saved = loadAccount();
+    setProvider(next);
+    // Clear any list from the other provider so the remembered account
+    // for *this* one can load in its place.
+    setGames([]);
+    const known = saved?.provider === next ? saved.username : '';
+    setUsername(known);
+    setConnected(known || null);
+    autoFetched.current = null;
+    go('provider');
   };
 
-  const showBack = route !== 'root';
+  const switchAccount = () => {
+    forgetAccount();
+    setUsername('');
+    setGames([]);
+    setError(null);
+    setConnected(null);
+    autoFetched.current = null;
+  };
+
+  const isRoot = route === 'root';
+  // On a connected provider the screen is about the account, not the
+  // site, so the account's name is the title.
+  const stepTitle =
+    route === 'provider' && provider
+      ? connected ?? PROVIDER_LABEL[provider]
+      : UNTITLED.has(route)
+        ? ''
+        : tr(`nav.${route}`);
+  const titleActs = route === 'provider' && !!connected;
+
+  useEffect(() => {
+    onNav?.({
+      title: stepTitle,
+      onBack: isRoot ? null : back,
+      onTitleTap: titleActs ? switchAccount : null,
+    });
+    // `back` is redefined every render; depending on it would report on
+    // every render instead of every step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, stepTitle, isRoot, titleActs, onNav]);
 
   return (
     <div className="home">
-      <div className="home-panel">
-        <header className="home-head">
-          {showBack ? (
-            <button type="button" className="icon-btn" onClick={back} aria-label="Back">
-              <IconBack />
-            </button>
-          ) : (
-            <span className="home-head-spacer" />
-          )}
-          <span className="home-head-title">
-            {route === 'provider' && provider ? PROVIDER_LABEL[provider] : TITLES[route]}
-          </span>
-          <span className="home-head-spacer" />
-        </header>
-
+      <div className={`home-panel${isRoot ? ' is-root' : ''}`}>
         {/* `key` restarts the enter animation on every step, which is what
             makes the flow read as navigation rather than a redraw. */}
         <div className="home-step" key={route}>
@@ -184,16 +278,16 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
           {route === 'root' && (
             <>
               <div className="home-intro">
-                <h1 className="home-title">Review your games<br />like a Grandmaster</h1>
-                <p className="home-sub">Real Stockfish, running on this machine.</p>
+                <h1 className="home-title">{tr('home.title')}</h1>
+                <p className="home-sub">{tr('home.subtitle')}</p>
               </div>
 
               <div className="choice-grid">
                 <button type="button" className="choice" onClick={() => go('connect')}>
                   <span className="choice-icon is-connect"><IconGlobe /></span>
                   <span className="choice-body">
-                    <span className="choice-title">Connect</span>
-                    <span className="choice-sub">Pull recent games from your account</span>
+                    <span className="choice-title">{tr('home.connect')}</span>
+                    <span className="choice-sub">{tr('home.connect.sub')}</span>
                   </span>
                   <IconChevronRight className="choice-arrow" />
                 </button>
@@ -201,8 +295,8 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
                 <button type="button" className="choice" onClick={() => go('local')}>
                   <span className="choice-icon is-local"><IconFolder /></span>
                   <span className="choice-body">
-                    <span className="choice-title">Local</span>
-                    <span className="choice-sub">Open a PGN from this device</span>
+                    <span className="choice-title">{tr('home.local')}</span>
+                    <span className="choice-sub">{tr('home.local.sub')}</span>
                   </span>
                   <IconChevronRight className="choice-arrow" />
                 </button>
@@ -228,9 +322,9 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
               <button
                 type="button"
                 className="choice"
-                onClick={() => { setProvider('lichess'); go('provider'); }}
+                onClick={() => openProvider('lichess')}
               >
-                <span className="choice-icon"><IconGlobe /></span>
+                <span className="choice-icon is-lichess"><IconLichess /></span>
                 <span className="choice-body">
                   <span className="choice-title">Lichess</span>
                   <span className="choice-sub">lichess.org</span>
@@ -241,9 +335,9 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
               <button
                 type="button"
                 className="choice"
-                onClick={() => { setProvider('chesscom'); go('provider'); }}
+                onClick={() => openProvider('chesscom')}
               >
-                <span className="choice-icon"><IconGlobe /></span>
+                <span className="choice-icon is-chesscom"><IconChessCom /></span>
                 <span className="choice-body">
                   <span className="choice-title">Chess.com</span>
                   <span className="choice-sub">chess.com</span>
@@ -255,34 +349,47 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
 
           {route === 'provider' && provider && (
             <>
-              <form
-                className="field-row"
-                onSubmit={(e) => { e.preventDefault(); void fetchGames(); }}
-              >
-                <input
-                  className="field"
-                  type="text"
-                  autoFocus
-                  placeholder={`Your ${PROVIDER_LABEL[provider]} username`}
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={loadingGames || !username.trim()}
+              {/* The account is named in the top bar, and switching is a
+                  tap on that name — so this screen is nothing but games.
+                  A remembered account never sees a search box: asking for
+                  the username again reads as "we lost you". */}
+              {connected ? null : (
+                <form
+                  className="field-row"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void fetchGames(provider, username);
+                  }}
                 >
-                  {loadingGames ? 'Looking…' : 'Find games'}
-                </button>
-              </form>
+                  <input
+                    className="field"
+                    type="text"
+                    autoFocus
+                    placeholder={tr('connect.username', { provider: PROVIDER_LABEL[provider] })}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={loadingGames || !username.trim()}
+                  >
+                    {loadingGames ? tr('connect.looking') : tr('connect.find')}
+                  </button>
+                </form>
+              )}
 
               {error && <p className="notice">{error}</p>}
 
               {games.length > 0 && (
                 <ul className="row-list">
-                  {games.map((g) => (
+                  {games.map((g, i) => (
                     <li key={g.id}>
-                      <button type="button" className="row" onClick={() => onImport(g.pgn)}>
+                      <button type="button" className="row" onClick={() => onImport(g.pgn, g.analysis)}>
+                        {/* Newest first, so the number is a position in the
+                            list rather than a game id — it is there to keep
+                            your place while scrolling a hundred rows. */}
+                        <span className="row-no num">{i + 1}</span>
                         <span className="row-main">
                           <span className="row-title">
                             {g.white}
@@ -310,8 +417,8 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
               <button type="button" className="choice" onClick={() => go('browse')}>
                 <span className="choice-icon"><IconSearch /></span>
                 <span className="choice-body">
-                  <span className="choice-title">Browse</span>
-                  <span className="choice-sub">Find the PGN files already on this device</span>
+                  <span className="choice-title">{tr('local.browse')}</span>
+                  <span className="choice-sub">{tr('local.browse.sub')}</span>
                 </span>
                 <IconChevronRight className="choice-arrow" />
               </button>
@@ -319,8 +426,8 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
               <button type="button" className="choice" onClick={() => go('paste')}>
                 <span className="choice-icon"><IconPaste /></span>
                 <span className="choice-body">
-                  <span className="choice-title">Paste</span>
-                  <span className="choice-sub">Drop in notation from anywhere</span>
+                  <span className="choice-title">{tr('local.paste')}</span>
+                  <span className="choice-sub">{tr('local.paste.sub')}</span>
                 </span>
                 <IconChevronRight className="choice-arrow" />
               </button>
@@ -329,13 +436,11 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
 
           {route === 'browse' && (
             <>
-              {scanning && (
-                <ul className="row-list">
-                  {[0, 1, 2, 3].map((i) => (
-                    <li key={i}><span className="row row-skeleton" /></li>
-                  ))}
-                </ul>
-              )}
+              {/* A line, not skeleton rows. The placeholders were built
+                  before rows became glass buttons; once they inherited
+                  that chrome they read as three broken, empty controls
+                  rather than as "loading". */}
+              {scanning && <p className="empty-note">{tr('local.scanning')}</p>}
 
               {!scanning && files && files.length > 0 && (
                 <ul className="row-list">
@@ -360,16 +465,16 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
               {!scanning && files && files.length === 0 && (
                 <p className="empty-note">
                   {scanError
-                    ? 'File scanning is only available in the desktop app.'
-                    : 'No PGN files found in Downloads, Documents or Desktop.'}
+                    ? tr('local.scanOnlyDesktop')
+                    : tr('local.noFiles')}
                 </p>
               )}
 
               <label className="file-drop">
                 <span className="file-drop-icon"><IconUpload /></span>
                 <span className="file-drop-body">
-                  <span className="row-title">Choose a file instead</span>
-                  <span className="row-meta">Pick any .pgn from your device</span>
+                  <span className="row-title">{tr('local.chooseFile')}</span>
+                  <span className="row-meta">{tr('local.chooseFile.sub')}</span>
                 </span>
                 <input
                   type="file"
@@ -386,34 +491,16 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
           {route === 'library' && (
             <>
               {insights && insights.games >= MIN_GAMES_FOR_INSIGHTS && (
-                <div className="patterns">
-                  <p className="section-label">
-                    Your patterns · {insights.player}
-                  </p>
-                  <div className="insight-stats">
-                    <span className="insight-stat">
-                      <b className="num">{insights.averageAccuracy.toFixed(0)}%</b> accuracy
+                <button type="button" className="choice" onClick={() => go('stats')}>
+                  <span className="choice-icon is-library"><IconLibrary /></span>
+                  <span className="choice-body">
+                    <span className="choice-title">How you have been playing</span>
+                    <span className="choice-sub">
+                      Your habits and openings across {insights.games} games
                     </span>
-                    <span className="insight-stat">
-                      <b className="num">{insights.perGame.blunder.toFixed(1)}</b> blunders/game
-                    </span>
-                    <span className="insight-stat">
-                      <b className="num">{insights.wins}–{insights.draws}–{insights.losses}</b> W/D/L
-                    </span>
-                  </div>
-                  {insights.weaknesses.length > 0 && (
-                    <ul className="weakness-list">
-                      {insights.weaknesses.slice(0, 3).map((w) => (
-                        <li key={w.motif} className="weakness">
-                          <span className="weakness-label">{w.label}</span>
-                          <span className="weakness-rate num">
-                            {w.perGame >= 0.1 ? `${w.perGame.toFixed(1)}x/game` : `${w.count} total`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                  </span>
+                  <IconChevronRight className="choice-arrow" />
+                </button>
               )}
 
               <ul className="row-list">
@@ -433,6 +520,148 @@ export default function HomeFlow({ onImport, recent, onOpenRecent }: HomeFlowPro
               </ul>
             </>
           )}
+
+          {route === 'stats' && insights && (
+            <>
+              {/* Written for someone who has never seen an engine report:
+                  every number says what it means in the same breath. */}
+              <div className="stat-grid">
+                <div className={`stat-card is-${accuracyTone(insights.averageAccuracy)}`}>
+                  <span className="stat-value num">{insights.averageAccuracy.toFixed(0)}%</span>
+                  <span className="stat-name">{tr('stats.accuracy')}</span>
+                  <span className="stat-help">
+                    How close your moves were to the best available. 100% would be perfect play.
+                  </span>
+                </div>
+                <div className={`stat-card is-${blunderTone(insights.perGame.blunder)}`}>
+                  <span className="stat-value num">{insights.perGame.blunder.toFixed(1)}</span>
+                  <span className="stat-name">{tr('stats.blunders')}</span>
+                  <span className="stat-help">
+                    Moves that threw away a serious amount. Fewer is better.
+                  </span>
+                </div>
+                <div className={`stat-card is-${scoreTone(((insights.wins + insights.draws * 0.5) / Math.max(1, insights.games)) * 100)}`}>
+                  <span className="stat-value num">
+                    {insights.wins}–{insights.draws}–{insights.losses}
+                  </span>
+                  <span className="stat-name">{tr('stats.record')}</span>
+                  <span className="stat-help">Your record across these {insights.games} games.</span>
+                </div>
+              </div>
+
+              {insights.weaknesses.length > 0 && (
+                <>
+                  <p className="section-label">{tr('stats.weaknesses')}</p>
+                  <ul className="weakness-list">
+                    {insights.weaknesses.slice(0, 4).map((w) => (
+                      <li key={w.motif} className="weakness">
+                        <span className="weakness-label">{w.label}</span>
+                        <span className="weakness-rate num">
+                          {w.perGame >= 0.1 ? `${w.perGame.toFixed(1)} per game` : `${w.count} times`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {Object.keys(insights.lossesBy).length > 0 && (
+                <>
+                  <p className="section-label">{tr('stats.losses')}</p>
+                  <ul className="weakness-list">
+                    {Object.entries(insights.lossesBy)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([how, n]) => (
+                        <li key={how} className="weakness">
+                          <span className="weakness-label">
+                            {TERMINATION_LABELS[how as Termination] ?? how}
+                          </span>
+                          <span className="weakness-rate num">{n}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              )}
+
+              {openings.length > 0 && (
+                <>
+                  <p className="section-label">{tr('stats.openings')}</p>
+                  <ul className="row-list">
+                    {openings.map((o) => (
+                      <li key={o.name}>
+                        <button
+                          type="button"
+                          className={`row is-${scoreTone(o.score * 100)}`}
+                          onClick={() => { setOpenOpening(o.name); go('opening'); }}
+                        >
+                          <span className="row-main">
+                            <span className="row-title">{o.name}</span>
+                            <span className="row-meta">
+                              {o.games} game{o.games === 1 ? '' : 's'} · won{' '}
+                              {Math.round(o.score * 100)}% of the points
+                              {o.averageBookExit !== null &&
+                                ` · followed theory to move ${Math.max(1, Math.round(o.averageBookExit / 2))}`}
+                            </span>
+                          </span>
+                          <IconChevronRight className="row-arrow" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
+          )}
+
+          {route === 'opening' && openOpening && (() => {
+            const record = openings.find((o) => o.name === openOpening);
+            if (!record) return <p className="empty-note">That opening is no longer in your library.</p>;
+            return (
+              <>
+                <div className="opening-head">
+                  <h2 className="opening-title">{record.name}</h2>
+                  {record.eco && <span className="opening-eco num">{record.eco}</span>}
+                </div>
+
+                <div className="stat-grid">
+                  <div className="stat-card">
+                    <span className="stat-value num">{record.games}</span>
+                    <span className="stat-name">{tr('opening.timesPlayed')}</span>
+                  </div>
+                  <div className={`stat-card is-${scoreTone(record.score * 100)}`}>
+                    <span className="stat-value num">{Math.round(record.score * 100)}%</span>
+                    <span className="stat-name">{tr('opening.pointsWon')}</span>
+                    <span className="stat-help">
+                      A win counts 1, a draw counts a half. 50% means you break even.
+                    </span>
+                  </div>
+                  <div className={`stat-card is-${accuracyTone(record.accuracy)}`}>
+                    <span className="stat-value num">{record.accuracy.toFixed(0)}%</span>
+                    <span className="stat-name">{tr('opening.accuracy')}</span>
+                  </div>
+                </div>
+
+                <p className="opening-note">
+                  {record.wins}&nbsp;won, {record.draws}&nbsp;drawn, {record.losses}&nbsp;lost.
+                  {record.averageBookExit !== null && (
+                    <>
+                      {' '}You usually follow known theory until about move{' '}
+                      <strong>{Math.max(1, Math.round(record.averageBookExit / 2))}</strong>, then
+                      start playing your own moves. That is the point worth studying next — it is
+                      where preparation stops helping you.
+                    </>
+                  )}
+                </p>
+
+                <p className="section-label">What theory is</p>
+                <p className="opening-note">
+                  Openings have well-trodden paths that strong players have worked out over decades.
+                  Following them keeps you on ground others have already tested. Leaving them early
+                  is not wrong, but it means you are on your own sooner than your opponent may be.
+                </p>
+              </>
+            );
+          })()}
 
           {route === 'paste' && (
             <>

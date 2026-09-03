@@ -4,6 +4,7 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{path::BaseDirectory, Emitter, Manager};
 
+mod assets;
 mod correction;
 mod pgn_scan;
 mod slm;
@@ -26,6 +27,120 @@ struct ReviewControl {
     current_run: AtomicU64,
 }
 
+/// The name Stockfish is shipped under inside an Android package.
+///
+/// Android will only execute files from an app's native library
+/// directory — since API 29 the data directory is mounted W^X, so the
+/// usual "unpack a helper binary and chmod +x it" approach fails. The
+/// library directory is populated exclusively from `jniLibs`, and only
+/// with files matching `lib*.so`, so the engine has to travel under a
+/// library's name even though it is an ordinary executable.
+#[cfg(target_os = "android")]
+const ANDROID_ENGINE_LIB: &str = "libstockfish.so";
+
+/// The Rust library this very process is running from. Used to locate the
+/// directory Android extracted it into.
+#[cfg(target_os = "android")]
+const ANDROID_SELF_LIB: &str = "libchesy_lib.so";
+
+/// Finds the app's native library directory by asking which file the
+/// current process was mapped from.
+///
+/// The alternative is a JNI round-trip for
+/// `ApplicationInfo.nativeLibraryDir`, which needs a JavaVM handle and a
+/// live Activity. This needs neither: our own code is executing from a
+/// `.so` that Android already extracted into exactly that directory, so
+/// the mapping tells us where it is.
+///
+/// Split from the file read so the parsing — the part that actually has
+/// edge cases — can be tested on a real `/proc/self/maps` sample. It is
+/// compiled on every platform for exactly that reason: the logic is pure
+/// string handling, and gating it behind Android would mean it could only
+/// ever be tested by building for a phone.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+fn native_library_dir_from_maps(maps: &str, self_lib: &str) -> Option<std::path::PathBuf> {
+    let suffix = format!("/{self_lib}");
+    for line in maps.lines() {
+        // Every column before the path (address range, permissions,
+        // offset, device, inode) is hex, letters, colons or dashes, so
+        // the first slash on the line begins the backing file's path.
+        let Some(start) = line.find('/') else { continue };
+        let path = &line[start..];
+
+        // `…/base.apk!/lib/arm64-v8a/libchesy_lib.so` means the library
+        // was mapped straight out of the (uncompressed) APK and was never
+        // written to disk as its own file. Nothing there can be executed,
+        // and the engine will not have been extracted either — which is
+        // why the packaging must keep legacy extraction turned on.
+        if path.contains("!/") {
+            continue;
+        }
+        if path.ends_with(&suffix) {
+            return std::path::Path::new(path).parent().map(|p| p.to_path_buf());
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "android")]
+fn android_engine_path() -> Option<String> {
+    let maps = std::fs::read_to_string("/proc/self/maps").ok()?;
+    let dir = native_library_dir_from_maps(&maps, ANDROID_SELF_LIB)?;
+    let engine = dir.join(ANDROID_ENGINE_LIB);
+    engine
+        .exists()
+        .then(|| engine.to_string_lossy().into_owned())
+}
+
+/// The engine's networks, as UCI options, if they have been downloaded.
+fn engine_nets(app: &tauri::AppHandle) -> Vec<(String, String)> {
+    [("EvalFile", "stockfish-net-big"), ("EvalFileSmall", "stockfish-net-small")]
+        .into_iter()
+        .filter_map(|(option, asset)| {
+            assets::installed_asset_path(app, asset)
+                .map(|p| (option.to_string(), p.to_string_lossy().into_owned()))
+        })
+        .collect()
+}
+
+/// How many search threads and how much hash to hand Stockfish.
+///
+/// Kept pure — no engine, no environment — so the policy can be tested
+/// directly, since the alternative is only ever discovering it was wrong
+/// on someone's phone.
+///
+/// The desktop numbers preserve the previous hard-coded 4 threads / 64MB
+/// on any machine with at least four cores, and merely stop over-
+/// subscribing a smaller one.
+fn engine_budget(cores: usize, mobile: bool) -> (usize, usize) {
+    if mobile {
+        // Half the cores, capped at four. Measured on a Galaxy S23
+        // (3x2.0GHz + 4x2.8GHz + 1x3.36GHz), running Stockfish 18's own
+        // bench back to back to let the package heat up:
+        //
+        //   threads   first run   sixth run   drop
+        //   2           820k nps    763k nps   -7%
+        //   4         2,020k nps  1,418k nps  -30%
+        //   8         2,525k nps  1,381k nps  -45%
+        //
+        // Eight threads wins on the first run and loses by the fourth:
+        // saturating every core heats the SoC enough that sustained
+        // throughput falls below what four threads hold, and a game
+        // review is a sustained load, not a single search. Four is also
+        // what leaves the WebView enough CPU to stay responsive while a
+        // review runs — a review that pins every core is what "app not
+        // responding" looked like. Throughput recovers fully after about
+        // forty seconds idle, so this is throttling, not damage.
+        let threads = (cores / 2).clamp(1, 4);
+        // Hash shares a much smaller memory budget with the WebView and
+        // the language model, and a transposition table that forces the
+        // system to evict them costs far more than it saves.
+        (threads, 32)
+    } else {
+        (cores.clamp(1, 4), 64)
+    }
+}
+
 /// Picks which Stockfish executable to launch. An explicit `engine_path`
 /// (e.g. a future settings UI) always wins. Otherwise, prefer the copy
 /// bundled into the app as a resource (see src-tauri/binaries/README.md)
@@ -33,10 +148,20 @@ struct ReviewControl {
 /// separately — falling back to a bare `stockfish` lookup on $PATH when
 /// no bundled copy is present, which is what happens in `tauri dev`
 /// (resources are only laid out on disk by a real `tauri build`).
+///
+/// Android takes a different route entirely: it has no $PATH worth
+/// searching and cannot execute a bundled resource, so the engine ships
+/// as a native library and is run from where the installer put it.
 fn resolve_engine_path(app: &tauri::AppHandle, engine_path: Option<String>) -> String {
     if let Some(path) = engine_path {
         return path;
     }
+
+    #[cfg(target_os = "android")]
+    if let Some(path) = android_engine_path() {
+        return path;
+    }
+
     match app.path().resolve("binaries/stockfish", BaseDirectory::Resource) {
         Ok(resolved) if resolved.exists() => resolved.to_string_lossy().into_owned(),
         _ => "stockfish".to_string(),
@@ -112,14 +237,37 @@ struct EngineSession {
 }
 
 impl EngineSession {
+    /// UCI options naming the network files, in the order they should be
+    /// sent. Empty when nothing has been downloaded yet, in which case
+    /// the engine will start but cannot evaluate — `check_engine` is what
+    /// turns that into a message the user sees.
     fn start_with_path(path: Option<&str>) -> Result<Self, String> {
+        Self::start_with_nets(path, &[])
+    }
+
+    fn start_with_nets(path: Option<&str>, nets: &[(String, String)]) -> Result<Self, String> {
         let exe = path.unwrap_or("stockfish");
         let mut child = Command::new(exe)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
             .map_err(|e| {
-                format!("Couldn't start Stockfish at '{exe}' — is it installed and accessible? ({e})")
+                // On Android there is no $PATH to install onto and no way
+                // for the user to fix this themselves: either the engine
+                // was packaged as a native library or it was not, so the
+                // message points at the build rather than the device.
+                if cfg!(target_os = "android") {
+                    format!(
+                        "Couldn't start the bundled Stockfish at '{exe}'. \
+                         The engine ships as a native library, so this build \
+                         is either missing it or was packaged without \
+                         native-library extraction. ({e})"
+                    )
+                } else {
+                    format!(
+                        "Couldn't start Stockfish at '{exe}' — is it installed and accessible? ({e})"
+                    )
+                }
             })?;
 
         let stdin = child.stdin.take().ok_or("Failed to open Stockfish stdin")?;
@@ -137,9 +285,21 @@ impl EngineSession {
         let engine_name = session.wait_for_uci_ok()?;
         session.engine_name = engine_name;
         
-        // Multi-threaded and hash allocation for fast desktop analysis
-        let _ = session.send("setoption name Threads value 4");
-        let _ = session.send("setoption name Hash value 64");
+        let cores = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
+        let (threads, hash_mb) =
+            engine_budget(cores, cfg!(any(target_os = "android", target_os = "ios")));
+        let _ = session.send(&format!("setoption name Threads value {threads}"));
+        let _ = session.send(&format!("setoption name Hash value {hash_mb}"));
+
+        // The networks are shipped as downloadable data rather than
+        // embedded, which is what takes the engine from 109MB to 1.3MB.
+        // Measured: with these set, the search is bit-identical to the
+        // build that carries them inside it.
+        for (option, file) in nets {
+            let _ = session.send(&format!("setoption name {option} value {file}"));
+        }
 
         session.send("isready")?;
         session.wait_for("readyok")?;
@@ -408,8 +568,11 @@ async fn analyze_game(
     // still happens *before* the analysis thread is spawned, so a
     // missing or broken engine fails this command immediately with a
     // clear error rather than surfacing later as a review-error event.
+    // Resolved before the closure: `app` is needed again by the analysis
+    // thread below, and the closure would otherwise take ownership of it.
+    let nets = engine_nets(&app);
     let mut session = tauri::async_runtime::spawn_blocking(move || {
-        let mut session = EngineSession::start_with_path(Some(&path))?;
+        let mut session = EngineSession::start_with_nets(Some(&path), &nets)?;
         // MultiPV=2 (the frontend's "Deep" mode) gives classification the
         // runner-up line needed to detect Great/Brilliant, at roughly 2x
         // engine time per position — an acceptable trade on desktop, but
@@ -514,7 +677,7 @@ async fn evaluate_position(
             .map_err(|_| "Practice engine lock poisoned".to_string())?;
 
         if slot.is_none() {
-            let mut session = EngineSession::start_with_path(Some(&path))?;
+            let mut session = EngineSession::start_with_nets(Some(&path), &engine_nets(&app))?;
             // Practice only ever needs the single best line; leaving
             // MultiPV at the engine default keeps each attempt cheap.
             session.set_multipv(1)?;
@@ -536,6 +699,101 @@ async fn evaluate_position(
     })
     .await
     .map_err(|e| format!("Position evaluation failed to run: {e}"))?
+}
+
+#[cfg(test)]
+mod engine_budget_tests {
+    use super::engine_budget;
+
+    #[test]
+    fn desktop_keeps_the_previous_four_threads_and_64mb() {
+        // The behaviour this replaced was a hard-coded 4/64. Any machine
+        // that could satisfy that before must still get it.
+        assert_eq!(engine_budget(8, false), (4, 64));
+        assert_eq!(engine_budget(16, false), (4, 64));
+        assert_eq!(engine_budget(4, false), (4, 64));
+    }
+
+    #[test]
+    fn desktop_stops_over_subscribing_a_small_machine() {
+        assert_eq!(engine_budget(2, false), (2, 64));
+        assert_eq!(engine_budget(1, false), (1, 64));
+    }
+
+    #[test]
+    fn mobile_leaves_half_the_cores_for_everything_else() {
+        // A Galaxy S23 reports 8; a mid-range phone 8 with far weaker
+        // little cores; a low-end one 4.
+        assert_eq!(engine_budget(8, true), (4, 32));
+        assert_eq!(engine_budget(4, true), (2, 32));
+    }
+
+    #[test]
+    fn mobile_never_asks_for_zero_threads() {
+        // `cores / 2` is 0 for a single-core device, and Stockfish
+        // rejects `Threads value 0`.
+        assert_eq!(engine_budget(1, true), (1, 32));
+    }
+
+    #[test]
+    fn mobile_is_always_at_most_desktop() {
+        for cores in 1..=64 {
+            let (m, mh) = engine_budget(cores, true);
+            let (d, dh) = engine_budget(cores, false);
+            assert!(m <= d, "{cores} cores: mobile {m} > desktop {d}");
+            assert!(mh <= dh);
+            assert!(m >= 1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod android_engine_path_tests {
+    use super::native_library_dir_from_maps;
+
+    /// Trimmed from a real `/proc/self/maps` on a Galaxy S23, keeping the
+    /// shapes that actually occur: anonymous regions, bracketed pseudo
+    /// files, a system library, and our own library in the app's native
+    /// library directory.
+    const MAPS: &str = "\
+12c00000-12c40000 rw-p 00000000 00:00 0                                  [anon:dalvik-main space]
+7f8a1c0000-7f8a1c4000 r--p 00000000 fd:03 1442  /apex/com.android.runtime/lib64/bionic/libc.so
+7f8a200000-7f8a9c0000 r--p 00000000 fd:03 9931  /data/app/~~kQ3n==/io.github.saqibsiddiq.chesy-Ab9==/lib/arm64/libchesy_lib.so
+7ff0a00000-7ff0a21000 rw-p 00000000 00:00 0                              [stack]
+";
+
+    #[test]
+    fn finds_the_directory_our_own_library_was_mapped_from() {
+        let dir = native_library_dir_from_maps(MAPS, "libchesy_lib.so").expect("should resolve");
+        assert_eq!(
+            dir.to_str().unwrap(),
+            "/data/app/~~kQ3n==/io.github.saqibsiddiq.chesy-Ab9==/lib/arm64"
+        );
+    }
+
+    #[test]
+    fn ignores_a_library_mapped_out_of_the_apk() {
+        // With native-library extraction disabled the library is mapped
+        // from inside the APK and no executable file exists on disk.
+        // Returning that path would produce a "not found" failure far from
+        // the actual cause, so it must not match.
+        let maps = "7f00-7f01 r--p 0 fd:03 9931  /data/app/~~x==/io.github.saqibsiddiq.chesy-y==/base.apk!/lib/arm64/libchesy_lib.so\n";
+        assert!(native_library_dir_from_maps(maps, "libchesy_lib.so").is_none());
+    }
+
+    #[test]
+    fn does_not_match_a_different_library_by_suffix() {
+        // `libmychesy_lib.so` ends with our name as a plain substring; only
+        // a whole final path segment counts.
+        let maps = "7f00-7f01 r--p 0 fd:03 1  /data/app/x/lib/arm64/libmychesy_lib.so\n";
+        assert!(native_library_dir_from_maps(maps, "libchesy_lib.so").is_none());
+    }
+
+    #[test]
+    fn returns_none_when_nothing_matches() {
+        let maps = "12c00000-12c40000 rw-p 00000000 00:00 0   [anon:dalvik-main space]\n";
+        assert!(native_library_dir_from_maps(maps, "libchesy_lib.so").is_none());
+    }
 }
 
 #[cfg(test)]
@@ -616,7 +874,9 @@ pub fn run() {
             storage::list_reviews,
             storage::load_review,
             storage::save_review,
-            storage::delete_review
+            storage::delete_review,
+            assets::asset_status,
+            assets::download_asset
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import type { AnalysisResult, Classification } from './analysis';
 import type { GameReview } from './reviewEngine';
 import type { ParsedGame } from './parsePgn';
+import { bookExitPly, openingFrom } from './openings';
+import { terminationFrom } from './termination';
 
 // Mirrors src-tauri/src/storage.rs. Only the engine output is persisted —
 // classifications and explanation text are recomputed on load, which was
@@ -22,6 +24,13 @@ export interface ReviewSummary {
   blackCounts: Partial<Record<Classification, number>>;
   whiteMotifs: Record<string, number>;
   blackMotifs: Record<string, number>;
+  /** Opening identity, and the ply at which the game left the mined
+   *  book. Optional: summaries saved before this existed lack them. */
+  opening?: string | null;
+  eco?: string | null;
+  bookExitPly?: number | null;
+  /** How the game ended, e.g. `timeout`. */
+  termination?: string | null;
 }
 
 export interface StoredReview {
@@ -74,7 +83,12 @@ export function buildSummary(
 ): ReviewSummary {
   const white = tally(review, 'w');
   const black = tally(review, 'b');
+  const opening = openingFrom(game.headers);
   return {
+    opening: opening.name,
+    eco: opening.eco,
+    bookExitPly: bookExitPly(game),
+    termination: terminationFrom(game.headers),
     id,
     savedAt: Date.now(),
     white: game.headers.White ?? 'Unknown',

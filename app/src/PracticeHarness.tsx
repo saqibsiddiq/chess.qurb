@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import ChessBoard from './components/ChessBoard';
 import HomeFlow from './components/HomeFlow';
+import PieceField from './components/PieceField';
 import EnginePanel from './components/EnginePanel';
 import { applyAttempt, type PracticeAttempt } from './lib/practice';
 import type { ReviewSummary } from './lib/storage';
@@ -32,6 +33,10 @@ const FAKE_RECENT: ReviewSummary[] = [
   blackCounts: { blunder: 1, mistake: 2, inaccuracy: 2 },
   whiteMotifs: { hanging_piece: 2, fork: 1, mate: 1 },
   blackMotifs: { hanging_piece: 1, allowed_mate: 1, back_rank: 1 },
+  opening: i % 2 === 0 ? 'Sicilian Defense' : 'French Defense',
+  eco: i % 2 === 0 ? 'B20' : 'C00',
+  bookExitPly: 6 + i,
+  termination: i === 1 ? 'timeout' : 'resignation',
 }));
 
 export default function PracticeHarness() {
@@ -39,15 +44,43 @@ export default function PracticeHarness() {
   // strips query strings on navigate, so a param-driven view can't be
   // reached from tooling.
   const [view, setView] = useState<'practice' | 'home'>('practice');
+  // The review screen runs the field in `static` mode; this switch is the
+  // only way to exercise that path outside the Tauri runtime.
+  const [fieldMode, setFieldMode] = useState<'live' | 'static'>('live');
   return (
     <>
-      <div style={{ padding: 8, display: 'flex', gap: 8 }}>
+      {/* Fixed, so it never steals height from the `.app` shell below —
+          the home view has to be measured against a true 100dvh or any
+          overflow finding is an artifact of this toolbar. */}
+      <div
+        style={{
+          position: 'fixed', top: 0, left: 0, zIndex: 9999,
+          padding: '2px 6px', display: 'flex', gap: 8, fontSize: 11,
+          background: 'rgba(0,0,0,.6)', color: '#fff',
+        }}
+      >
         <button id="view-practice" onClick={() => setView('practice')}>practice</button>
         <button id="view-home" onClick={() => setView('home')}>home</button>
+        <button id="field-mode" onClick={() => setFieldMode((m) => (m === 'live' ? 'static' : 'live'))}>
+          field: {fieldMode}
+        </button>
         <span>view: {view}</span>
       </div>
       {view === 'home' ? (
-        <HomeFlow onImport={() => {}} recent={FAKE_RECENT} onOpenRecent={() => {}} />
+        <div className="app">
+          <PieceField
+            mode={fieldMode}
+            theme={document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'}
+          />
+          {/* The real shell puts `.home` in the second grid row, under the
+              top bar. Without that row the panel sizes to its content and
+              overflows the viewport unscrollably, which is a property of
+              this harness rather than of the app. */}
+          <header className="topbar">
+            <span className="brand"><span>Chesy</span></span>
+          </header>
+          <HomeFlow onImport={() => {}} recent={FAKE_RECENT} onOpenRecent={() => {}} />
+        </div>
       ) : (
         <PracticeBoardHarness />
       )}

@@ -1,4 +1,5 @@
 import type { ReviewSummary } from './storage';
+import { outcomeFor, type Termination } from './termination';
 
 // Cross-game aggregation. A single review says "you blundered on move 23";
 // twenty reviews say "you hang pieces, and it happens about once a game" —
@@ -43,6 +44,10 @@ export interface PlayerInsights {
   draws: number;
   losses: number;
   averageAccuracy: number;
+  /** How the player's losses ended, keyed by termination. Losing on time
+   *  is a different problem from being outplayed, and nothing in a
+   *  move-quality score can tell them apart. */
+  lossesBy: Partial<Record<Termination, number>>;
   /// Costly-move counts per game, keyed by classification.
   perGame: Record<CostlyClass, number>;
   weaknesses: Weakness[];
@@ -71,12 +76,6 @@ export function detectPlayer(summaries: ReviewSummary[]): string | null {
   return best;
 }
 
-function resultFor(result: string, playedWhite: boolean): 'win' | 'draw' | 'loss' | null {
-  if (result === '1/2-1/2') return 'draw';
-  if (result === '1-0') return playedWhite ? 'win' : 'loss';
-  if (result === '0-1') return playedWhite ? 'loss' : 'win';
-  return null; // '*' — unfinished or unknown
-}
 
 export function aggregate(summaries: ReviewSummary[], player: string): PlayerInsights | null {
   const mine = summaries.filter((s) => s.white === player || s.black === player);
@@ -93,6 +92,7 @@ export function aggregate(summaries: ReviewSummary[], player: string): PlayerIns
     inaccuracy: 0,
   };
   const motifTotals = new Map<string, number>();
+  const lossesBy: Partial<Record<Termination, number>> = {};
 
   for (const s of mine) {
     const playedWhite = s.white === player;
@@ -100,16 +100,19 @@ export function aggregate(summaries: ReviewSummary[], player: string): PlayerIns
     const motifs = playedWhite ? s.whiteMotifs : s.blackMotifs;
     accuracyTotal += playedWhite ? s.whiteAccuracy : s.blackAccuracy;
 
-    switch (resultFor(s.result, playedWhite)) {
+    switch (outcomeFor(s.result, playedWhite)) {
       case 'win':
         wins += 1;
         break;
       case 'draw':
         draws += 1;
         break;
-      case 'loss':
+      case 'loss': {
         losses += 1;
+        const how = (s.termination ?? 'unknown') as Termination;
+        lossesBy[how] = (lossesBy[how] ?? 0) + 1;
         break;
+      }
       default:
         break;
     }
@@ -138,6 +141,7 @@ export function aggregate(summaries: ReviewSummary[], player: string): PlayerIns
     draws,
     losses,
     averageAccuracy: accuracyTotal / games,
+    lossesBy,
     perGame: {
       blunder: classTotals.blunder / games,
       mistake: classTotals.mistake / games,

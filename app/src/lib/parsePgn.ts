@@ -6,6 +6,10 @@ export interface ParsedMove {
   san: string;
   uci: string; // e.g. "e2e4", or "e7e8q" for a promotion
   fenAfter: string;
+  /** Seconds left on the mover's clock after this move, from the PGN's
+   *  `[%clk ...]` annotation. Both Lichess and Chess.com supply it on
+   *  every move; absent for PGNs that carry no clock data. */
+  clock?: number;
 }
 
 export interface ParsedGame {
@@ -148,6 +152,34 @@ function loadTolerantPgn(
  * position that results from playing it, plus a UCI-style move string
  * (from+to+promotion).
  */
+/**
+ * Clock readings from `[%clk ...]` comments, keyed by the FEN of the
+ * position the comment is attached to.
+ *
+ * Keyed by position rather than zipped by index on purpose: a PGN with
+ * clocks on only some moves would silently misalign every later reading
+ * if the two lists were zipped, attributing one player's time to another
+ * player's move.
+ */
+function clocksByFen(chess: Chess): Map<string, number> {
+  const byFen = new Map<string, number>();
+  for (const { fen, comment } of chess.getComments()) {
+    const match = comment.match(/\[%clk\s+([^\]]+)\]/);
+    if (!match) continue;
+    const seconds = parseClockText(match[1]);
+    if (seconds !== null) byFen.set(fen, seconds);
+  }
+  return byFen;
+}
+
+/** `H:MM:SS` or `H:MM:SS.s`. Kept local so parsePgn has no import cycle
+ *  with the clock module, which depends on ParsedGame. */
+function parseClockText(text: string): number | null {
+  const m = text.match(/(\d+):(\d{1,2}):(\d{1,2}(?:\.\d+)?)/);
+  if (!m) return null;
+  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+}
+
 export function parsePgn(pgn: string): ParsedGame {
   const normalizedPgn = pgn
     .replace(/^\uFEFF/, '')
@@ -175,6 +207,7 @@ export function parsePgn(pgn: string): ParsedGame {
   }
 
   const startingFen = headers.SetUp === '1' && headers.FEN ? headers.FEN : new Chess().fen();
+  const clocks = clocksByFen(chess);
 
   // Replay the game move by move on a fresh board to capture FENs & UCI notations
   const replay = new Chess(startingFen);
@@ -189,12 +222,14 @@ export function parsePgn(pgn: string): ParsedGame {
     );
     const uci = `${moveResult.from}${moveResult.to}${moveResult.promotion ?? ''}`;
     if (color === 'b') moveNumber += 1;
+    const fenAfter = replay.fen();
     return {
       moveNumber: currentMoveNumber,
       color,
       san: parsedMove.san,
       uci,
-      fenAfter: replay.fen(),
+      fenAfter,
+      clock: clocks.get(fenAfter),
     };
   });
 

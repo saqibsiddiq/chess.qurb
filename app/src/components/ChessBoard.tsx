@@ -7,6 +7,11 @@ import type { Key } from '@lichess-org/chessground/types';
 // Chessground stylesheets
 import '@lichess-org/chessground/assets/chessground.base.css';
 import '@lichess-org/chessground/assets/chessground.brown.css';
+// cburnett, chessground's default set — chosen for how it looks beside
+// the rest of the app. Worth knowing it is GPLv2+ (see Lichess's
+// COPYING.md), so shipping it carries that licence's obligations even
+// though the rest of this app is MIT. The CC0 alternative that avoids
+// them is kept at ../assets/chessground.rhosgfx.css.
 import '@lichess-org/chessground/assets/chessground.cburnett.css';
 
 interface ChessBoardProps {

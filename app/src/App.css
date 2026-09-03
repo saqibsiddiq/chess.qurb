@@ -72,6 +72,26 @@
   --c-miss:       #e0645a;
   --c-blunder:    #d3443a;
 
+  /* ── Glass ──────────────────────────────────────────────
+     Used only where text sits over the moving piece field: the top bar,
+     the explanation, and overlays. Blur is charged per painted frame
+     against whatever is behind it, so three surfaces is a deliberate
+     ceiling rather than a style applied everywhere. */
+  --glass-fill:      color-mix(in srgb, var(--panel) 58%, transparent);
+  --glass-blur:      blur(24px) saturate(180%);
+  --glass-edge:      rgba(255,255,255,.55);
+  --glass-specular:  rgba(255,255,255,.75);
+  --glass-shadow:    0 8px 32px rgba(18,19,23,.14);
+
+  /* Text colour for a tinted statistic card. The classification accents
+     are tuned to sit on the plain panel, and measured 2.18:1 (green) and
+     1.90:1 (amber) once the card behind them is tinted with the same hue
+     — nowhere near the 4.5:1 that 22px/500 text needs. These are the
+     same hues darkened until they pass against that tinted ground. */
+  --tone-good-ink: #41661a;
+  --tone-ok-ink:   #85560c;
+  --tone-weak-ink: #b73026;
+
   /* ── Board ───────────────────────────────────────────── */
   --board-light: #eef1f6;
   --board-dark:  #aebbcc;
@@ -176,6 +196,16 @@ ul{list-style:none}
   grid-template-rows:auto minmax(0,1fr);
   overflow:hidden;
   background:var(--canvas);
+  /* Android 15 draws every app edge-to-edge once it targets SDK 35+, and
+     this one targets 36 — so without these the top bar renders underneath
+     the status bar and the back button sits behind the system clock.
+     Measured on a Galaxy S23. The piece field is viewport-fixed and
+     deliberately stays outside this padding, so the background still runs
+     under the system bars while the controls do not. */
+  padding-top:env(safe-area-inset-top, 0px);
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+  padding-left:env(safe-area-inset-left, 0px);
+  padding-right:env(safe-area-inset-right, 0px);
 }
 /* Grid items default to min-width:auto, which lets one wide child (a long
    PV line, a move row) push the view past the viewport. The shell clips
@@ -223,6 +253,20 @@ ul{list-style:none}
   --accent-soft:       rgba(122,167,255,.14);
   --accent-line:       rgba(122,167,255,.34);
 
+  /* On the dark ground the green and amber accents already clear 4.5:1
+     against their tinted cards (measured 5.48 and 6.27), so they are used
+     unmodified; only the red needs lifting, at 3.33:1 as-is. */
+  /* On the dark ground the specular edge has to be much quieter, or the
+     rim reads as a hard white outline rather than a lit edge. */
+  --glass-fill:      color-mix(in srgb, var(--panel) 62%, transparent);
+  --glass-edge:      rgba(255,255,255,.10);
+  --glass-specular:  rgba(255,255,255,.16);
+  --glass-shadow:    0 10px 34px rgba(0,0,0,.46);
+
+  --tone-good-ink:     #7cb342;
+  --tone-ok-ink:       #e8a33d;
+  --tone-weak-ink:     #e8695f;
+
   --primary:           #2b62cf;
   --on-primary:        #fff;
   --primary-hover:     #3a74e4;
@@ -239,13 +283,8 @@ ul{list-style:none}
   color-scheme: dark;
 }
 
-/* The insight card's own shadow is authored for a light ground. */
-[data-theme="dark"] .insight{
-  box-shadow:0 0 0 1px var(--line-soft),0 10px 30px rgba(0,0,0,.45);
-}
 [data-theme="dark"] *::-webkit-scrollbar-thumb{background:rgba(232,235,241,.16);background-clip:content-box}
 [data-theme="dark"] *::-webkit-scrollbar-thumb:hover{background:rgba(232,235,241,.26);background-clip:content-box}
-[data-theme="dark"] .step-zone-chevron{background:rgba(33,37,45,.92);box-shadow:0 0 0 1px rgba(232,235,241,.08),0 3px 12px rgba(0,0,0,.5)}
 [data-theme="dark"] .graph-area-white{fill:rgba(50,121,249,.20)}
 [data-theme="dark"] .graph-area-black{fill:rgba(232,235,241,.08)}
 
@@ -267,16 +306,18 @@ ul{list-style:none}
   height:var(--topbar-h);
   padding-inline:var(--gutter);
   /* Deliberately the same surface as the shell, with no hairline: the
-     header is part of the app, not a chrome bar sitting on top of it. */
-  background:var(--canvas);
+     header is part of the app, not a chrome bar sitting on top of it.
+     Transparent rather than `--canvas`, so the piece field drifting
+     behind the shell is not cut off by a solid band across the top. */
+  background:transparent;
   position:relative;z-index:20;
 }
 
 .brand{display:inline-flex;align-items:center;gap:8px;font-size:var(--fs-md);font-weight:500;letter-spacing:-.2px}
-.brand-mark{width:18px;height:18px;flex:none}
+.brand-mark{width:20px;height:20px;flex:none}
 .brand-mark path{fill:var(--ink)}
 
-.topbar-title{min-width:0;flex:1;display:flex;align-items:center;gap:var(--s-2)}
+.topbar-title{position:relative;min-width:0;flex:1;display:flex;align-items:center;gap:var(--s-2)}
 .topbar-title .players{
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   color:var(--ink-soft);
@@ -284,7 +325,7 @@ ul{list-style:none}
 .topbar-actions{display:flex;align-items:center;gap:var(--s-2);margin-left:auto}
 
 .icon-btn{
-  width:32px;height:32px;flex:none;
+  width:38px;height:38px;flex:none;
   display:grid;place-items:center;
   border-radius:var(--r-sm);
   color:var(--ink-soft);
@@ -292,7 +333,7 @@ ul{list-style:none}
 }
 .icon-btn:hover{background:var(--tint);color:var(--ink)}
 .icon-btn:active{background:var(--tint-strong)}
-.icon-btn svg{width:17px;height:17px;fill:currentColor}
+.icon-btn svg{width:21px;height:21px;fill:currentColor}
 
 .status-pill{
   display:inline-flex;align-items:center;gap:7px;
@@ -350,28 +391,35 @@ ul{list-style:none}
 }
 
 .home-panel{
-  width:100%;max-width:520px;
-  background:var(--panel);
-  border-radius:var(--r-xl);
-  box-shadow:var(--e-3);
-  overflow:hidden;
-}
+  /* No card. Content sits on the app background with the piece field
+     drifting behind it; grouping is carried by spacing, hairlines and
+     type hierarchy rather than a box drawn around everything.
 
-.home-head{
-  display:flex;align-items:center;gap:var(--s-2);
-  padding:10px 10px 0;
-  min-height:44px;
+     The element stays because the *layout* still needs it: it bounds the
+     screen and lets `.home-step` take the leftover height and scroll
+     inside itself, which is what keeps a long screen reachable on a
+     phone. Only the chrome is gone. */
+  width:100%;
+  display:flex;flex-direction:column;
+  max-height:100%;min-height:0;
 }
-.home-head-spacer{width:32px;flex:none}
-.home-head-title{
-  flex:1;text-align:center;
-  font-size:var(--fs-sm);font-weight:500;color:var(--ink-soft);
-}
+/* Only the first screen is a centred column. The steps after it — game
+   lists, statistics, an opening — are denser and read better across the
+   full width they are given. */
+.home-panel.is-root{max-width:min(560px, 100%)}
+.home:has(.home-panel:not(.is-root)){justify-content:flex-start}
+
+
 
 .home-step{
   display:flex;flex-direction:column;gap:var(--s-3);
   padding:var(--s-3) var(--s-5) var(--s-5);
   animation:step-in var(--t-enter) var(--ease-enter) both;
+  /* The pane manages its own overflow rather than the screen scrolling:
+     the card's header stays put and only its content moves. */
+  flex:1 1 auto;min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
 }
 @keyframes step-in{
   from{opacity:0;transform:translateY(6px)}
@@ -380,6 +428,7 @@ ul{list-style:none}
 
 .home-intro{text-align:center;padding:var(--s-4) 0 var(--s-5)}
 .home-title{
+  white-space:pre-line;
   font-size:var(--fs-display);line-height:var(--lh-display);
   letter-spacing:var(--ls-display);font-weight:500;
 }
@@ -392,17 +441,18 @@ ul{list-style:none}
   display:flex;align-items:center;gap:var(--s-3);
   padding:14px 14px 14px 13px;
   border-radius:var(--r-md);
-  background:var(--panel);
-  box-shadow:inset 0 0 0 1px var(--line);
+  /* A row in a list, not a card. The hairline below does the grouping,
+     and the field stays visible straight through. */
+  background:transparent;
+  box-shadow:none;
   text-align:left;
   transition:background var(--t-fast) var(--ease),
              box-shadow var(--t-fast) var(--ease),
              transform var(--t-fast) var(--ease);
 }
+
 .choice:hover{
-  background:var(--panel-sunken);
-  box-shadow:inset 0 0 0 1px rgba(18,19,23,.16),0 3px 12px rgba(18,19,23,.06);
-  transform:translateY(-1px);
+  background:var(--tint);
 }
 .choice:active{transform:translateY(0)}
 
@@ -427,11 +477,22 @@ ul{list-style:none}
 .choice:hover .choice-arrow{transform:translateX(2px);fill:var(--ink-soft)}
 
 /* Rows — games, files, recent reviews. */
-.row-list{display:flex;flex-direction:column;gap:2px;max-height:min(46vh,340px);overflow-y:auto;margin-inline:-6px;padding-inline:6px}
+.row-list{
+  /* Not a scroll container. It used to be one with a height cap; without
+     the cap it is as tall as its content, so it can never scroll — and
+     `overscroll-behavior: contain` on an element that cannot scroll
+     *stops the gesture reaching the ancestor that can*. That is why a
+     list of a hundred games would not move under a finger. The step
+     above owns the scrolling now. */
+  display:flex;flex-direction:column;gap:4px;
+  min-height:0;
+  margin-inline:-6px;padding-inline:6px;
+}
+
 
 .row{
   display:flex;align-items:center;gap:var(--s-3);
-  width:100%;padding:9px 10px;
+  width:100%;padding:11px 10px;
   border-radius:var(--r-sm);
   text-align:left;
   transition:background var(--t-fast) var(--ease);
@@ -444,13 +505,6 @@ ul{list-style:none}
 .row-arrow{width:14px;height:14px;flex:none;fill:var(--ink-ghost);opacity:0;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
 .row:hover .row-arrow{opacity:1;transform:translateX(2px)}
 
-.row-skeleton{
-  display:block;height:44px;border-radius:var(--r-sm);
-  background:linear-gradient(90deg,var(--panel-sunken) 25%,var(--panel-hover) 37%,var(--panel-sunken) 63%);
-  background-size:400% 100%;
-  animation:shimmer 1.3s linear infinite;
-}
-@keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
 
 .field-row{display:flex;gap:8px}
 .field{
@@ -532,46 +586,67 @@ ul{list-style:none}
 .review{
   min-height:0;
   display:grid;
-  /* Definite tracks, not `auto`: the board sizes itself from the space the
-     stage is given, so the stage's height can never come from the board.
-     The column is pinned the same way so content cannot widen it. */
   grid-template-columns:minmax(0,1fr);
-  grid-template-rows:minmax(0,1.42fr) minmax(0,1fr);
-  overflow:hidden;
-}
+  /* The board's row is a *fixed* size and the insight takes what is left.
 
-/* ── Stage ──────────────────────────────────────────────── */
-
-.stage{
-  display:flex;flex-direction:column;
-  min-height:0;min-width:0;
-  padding:var(--s-3) var(--gutter) 0;
+     This is the opposite of the obvious arrangement, and deliberately so:
+     when the board was the flexible row, its size depended on how long
+     the current move's explanation happened to be, so the board visibly
+     resized as you stepped through the game. A board that changes size
+     under your thumb is worse than a slightly smaller one. Now the board
+     is the same size on every move and the explanation scrolls. */
+  grid-template-rows:minmax(0,1fr) var(--board-size) auto auto;
+  grid-template-areas:
+    "insight"
+    "board"
+    "strip"
+    "extras";
   gap:var(--s-2);
-  /* Width of the aligned column. The eval rail only exists from 900px up,
-     so the allowance for it belongs in the media query, not in the
-     measurement — otherwise the rows sit 16px wider than the board on
-     phones and the whole stage reads as slightly off-centre. */
-  --stage-w:var(--board-px,100%);
+  padding-top:var(--s-2);
+  overflow:hidden;
+  /* Width first, capped by height so it still fits a short window. The
+     16px allowance is the eval rail and its gap, which come out of the
+     same row. */
+  /* Width is what limits the board on a phone, not height, so the only
+     way to make it bigger is to give back the padding either side. 6px
+     plus a 12px rail allowance instead of 16px plus 18px. */
+  --board-size:min(
+    calc(100vw - 12px - 12px),
+    58dvh
+  );
 }
 
-/* Everything in the stage other than the board is pinned to the board's
-   own width, so the column reads as one aligned object instead of a
-   centred board with controls drifting to the window edges. */
-.stage-head,.stepper,.graph-wrap{
-  width:100%;
-  max-width:var(--stage-w,100%);
-  margin-inline:auto;
+.band{min-width:0}
+
+.band-insight{
+  grid-area:insight;
+  min-width:0;min-height:0;
+  /* Hugs its content instead of stretching to fill the row. A short
+     verdict is two lines, and a glass card stretched to 550px around two
+     lines of text is exactly the wasted space this redesign was for. It
+     still scrolls when an expanded explanation outgrows the row. */
+  align-self:start;
+  max-height:100%;
+  display:flex;flex-direction:column;gap:var(--s-2);
+  /* Takes the leftover height rather than dictating it, and scrolls
+     inside itself when an explanation runs long. The screen never
+     scrolls, and the board never moves. */
+  overflow-y:auto;overscroll-behavior:contain;
 }
 
-.stage-head{
-  display:flex;align-items:center;justify-content:space-between;
-  gap:var(--s-2);min-height:30px;
+.band-board{
+  grid-area:board;
+  padding-inline:6px;
+  /* Explicit, not inherited from whatever the row happens to be. The
+     board must be the same size on every move in every layout. */
+  height:var(--board-size);
+  min-height:0;min-width:0;
+  display:flex;flex-direction:column;gap:var(--s-2);
 }
-.stage-move{display:flex;align-items:center;gap:var(--s-2);min-width:0}
-.stage-move .san{font-size:var(--fs-lg);font-weight:500;letter-spacing:var(--ls-lg);white-space:nowrap}
-.stage-tools{display:flex;align-items:center;gap:6px;flex:none}
 
-.stage-inner{display:flex;flex:1 1 auto;min-height:0;min-width:0}
+/* Only shown where there is room for it; on a phone this content lives
+   behind the two buttons under the strip instead. */
+.detail{display:none}
 
 .board-fit{
   flex:1 1 auto;min-height:0;min-width:0;
@@ -590,7 +665,7 @@ ul{list-style:none}
 }
 
 .board-container{width:100%;height:100%;position:relative}
-.board-container .cg-wrap{width:100%!important;height:100%!important;position:relative}
+.board-container.cg-wrap{width:100%!important;height:100%!important;position:relative}
 
 /* Neutral two-tone board replacing chessground's brown theme.
    A conic gradient, not the 45°-linear-gradient checkerboard trick —
@@ -605,24 +680,47 @@ ul{list-style:none}
   background-size:25% 25%;
 }
 
-/* chessground's themes colour coordinates per square shade; this palette
-   is different, so they get one readable colour instead — otherwise half
-   of them vanish into the squares. */
-.board-container .cg-wrap coords{
-  z-index:4;font-family:var(--mono);font-size:9px;letter-spacing:0;font-weight:500;
+/* Coordinates take their colour from the square they sit on, which is
+   what chessground's `coord-light`/`coord-dark` classes are for. The
+   previous rule painted every one of them the same light grey, so the
+   half sitting on light squares were invisible — which read as missing
+   or wrong letters rather than as unreadable ones.
+
+   Black and white at low alpha rather than theme tokens, because the
+   board palette is a separate user choice: these have to stay legible on
+   slate, classic, ocean and walnut alike. */
+.board-container.cg-wrap coords{
+  z-index:4;font-family:var(--mono);font-size:10px;letter-spacing:0;font-weight:600;
 }
-.board-container .cg-wrap coords coord,
-.board-container .cg-wrap coords.ranks coord:nth-child(2n),
-.board-container .cg-wrap coords.files coord:nth-child(2n){
-  color:var(--ink-soft);opacity:.62;
+/* The last file used to sit past the board's right edge, where the
+   square's `overflow:hidden` cut it in half. */
+.board-container.cg-wrap coords.files coord:last-child{padding-right:2px}
+/* Dark ink on *both* shades. The usual light-on-dark trick assumes dark
+   squares are actually dark; these palettes are light-to-mid, and white
+   at 78% measured only 2.68:1 on slate's darker square. Near-black gives
+   14.6:1 on the light square and 6:1 or better on the darker one for
+   slate, classic and ocean. */
+.board-container.cg-wrap coords coord.coord-light{color:rgba(18,20,26,.72)}
+.board-container.cg-wrap coords coord.coord-dark{color:rgba(18,20,26,.82)}
+/* Walnut is the one palette dark enough to invert: its brown square
+   drops below 4.5:1 against dark ink, and clears 5.5:1 against white. */
+:root[data-board="walnut"] .board-container.cg-wrap coords coord.coord-dark{
+  color:rgba(255,255,255,.88);
 }
-.board-container .cg-wrap coords.ranks{left:3px}
-.board-container .cg-wrap coords.files{bottom:0;padding-left:3px}
+.board-container.cg-wrap coords.ranks{left:3px}
+/* Pinned to the board's own left edge: chessground was offsetting this
+   row 24px to the right, which pushed the last file past the square and
+   `overflow:hidden` cut it in half. */
+.board-container.cg-wrap coords.files{bottom:1px;left:0;width:100%}
 
 /* ── Eval rail ──────────────────────────────────────────── */
 
 .eval-rail{
-  display:none;
+  /* Shown at every width now. It is the fastest read of who stands
+     better, it costs 8px, and `BoardStage` reserves its width in the
+     board measurement whether or not it is painted — so hiding it on a
+     phone gave the board nothing back. */
+  display:block;
   width:8px;flex:none;
   height:var(--board-px,100%);max-height:100%;
   border-radius:var(--r-pill);
@@ -647,68 +745,33 @@ ul{list-style:none}
 }
 .step-zone{position:relative;display:grid;place-items:center;cursor:pointer}
 .step-zone.is-center{cursor:default}
-.step-zone-chevron{
-  display:grid;place-items:center;
-  width:38px;height:38px;
-  border-radius:var(--r-pill);
-  background:rgba(255,255,255,.9);
-  box-shadow:0 0 0 1px rgba(18,19,23,.06),0 3px 12px rgba(18,19,23,.16);
-  opacity:0;transform:scale(.8);
-  transition:opacity var(--t-base) var(--ease),transform var(--t-base) var(--ease);
-  pointer-events:none;
-}
-.step-zone-chevron svg{width:17px;height:17px;fill:var(--ink)}
-.step-zone:hover .step-zone-chevron{opacity:.94;transform:scale(1)}
-.step-zone.is-disabled .step-zone-chevron{opacity:0!important}
+
 /* Flashed on every tap and swipe, so touch gets the confirmation that
    hover gives a mouse. */
-.step-zone.is-flashed .step-zone-chevron{opacity:1;transform:scale(1.08);transition-duration:60ms}
-.step-zones.is-hinting .step-zone-chevron{opacity:.9;transform:scale(1)}
 
 .jump-toast{
   position:absolute;left:50%;bottom:14px;z-index:6;
   transform:translateX(-50%);
   padding:6px 14px;border-radius:var(--r-pill);
-  background:rgba(18,19,23,.92);color:var(--on-inverse);
+  background:rgba(18,19,23,.92);color:var(--ink);
   font-size:var(--fs-sm);pointer-events:none;
   animation:toast-in var(--t-base) var(--ease) both;
 }
 @keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%)}}
 
-/* ── Stepper ────────────────────────────────────────────── */
-
-.stepper{
-  display:flex;align-items:center;justify-content:center;gap:4px;
-  padding:6px;flex:none;
-  background:var(--panel);
-  border-radius:var(--r-pill);
-  box-shadow:var(--e-1);
-}
-.step-btn{
-  width:38px;height:32px;display:grid;place-items:center;
-  border-radius:var(--r-pill);color:var(--ink-soft);
-  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease),opacity var(--t-fast) var(--ease);
-}
-.step-btn:hover:not(:disabled){background:var(--tint);color:var(--ink)}
-.step-btn:disabled{opacity:.25;cursor:default}
-.step-btn svg{width:16px;height:16px;fill:currentColor}
-.step-count{
-  min-width:76px;text-align:center;
-  font-family:var(--mono);font-variant-numeric:tabular-nums;
-  font-size:var(--fs-sm);letter-spacing:0;color:var(--ink-soft);
-}
-
 /* ── Progress ───────────────────────────────────────────── */
 
-.progress{flex:none;display:flex;flex-direction:column;gap:5px;width:100%;max-width:var(--stage-w,100%);margin-inline:auto}
+.progress{flex:none;display:flex;flex-direction:column;gap:5px;width:100%}
 .progress-label{display:flex;justify-content:space-between;gap:var(--s-2);color:var(--ink-faint);font-size:var(--fs-sm)}
 .progress-track{height:3px;border-radius:var(--r-pill);background:var(--canvas-deep);overflow:hidden}
 .progress-fill{height:100%;background:var(--ink);border-radius:inherit;transition:width var(--t-base) var(--ease)}
 
 /* ── Graph ──────────────────────────────────────────────── */
 
-.graph-wrap{flex:none;padding-bottom:var(--s-3);display:flex;flex-direction:column;gap:4px}
-.graph-head{display:flex;align-items:center;gap:var(--s-2);min-height:22px}
+.graph-meta{
+  display:flex;align-items:center;gap:var(--s-2);flex-wrap:wrap;
+  margin-bottom:var(--s-2);
+}
 .graph-readout{
   flex:1;min-width:0;display:flex;align-items:baseline;gap:var(--s-2);
   justify-content:flex-end;
@@ -716,17 +779,10 @@ ul{list-style:none}
 }
 .graph-readout-move{overflow:hidden;text-overflow:ellipsis}
 .graph-readout-tag{font-size:var(--fs-xs);font-weight:500}
-.graph-toggle{
-  display:grid;place-items:center;width:22px;height:22px;flex:none;
-  border-radius:var(--r-pill);color:var(--ink-faint);
-  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
-}
-.graph-toggle:hover{background:var(--tint);color:var(--ink)}
-.graph-toggle svg{width:14px;height:14px;fill:currentColor;transform:rotate(90deg);transition:transform var(--t-base) var(--ease)}
-.graph-wrap.is-collapsed .graph-toggle svg{transform:rotate(-90deg)}
 
-/* Readout tag reuses the classification ramp so a word here means the
-   same thing it means on a badge, a glyph and an accuracy bar. */
+/* The classification ramp, shared by the move strip, the readout, the
+   turning-point dots and the accuracy bars, so one word means the same
+   thing everywhere it appears. */
 .c-brilliant{color:var(--c-brilliant)}
 .c-great{color:var(--c-great)}
 .c-best{color:var(--c-best)}
@@ -737,21 +793,27 @@ ul{list-style:none}
 .c-mistake{color:var(--c-mistake)}
 .c-miss{color:var(--c-miss)}
 .c-blunder{color:var(--c-blunder)}
-.graph-tick{stroke:var(--line-soft);stroke-width:1}
-.graph-tick-label{fill:var(--ink-ghost);font-size:9px;font-family:var(--mono)}
-.game-graph{height:104px;min-height:104px;flex:none;
-  display:block;width:100%;height:52px;
-  background:var(--panel);
+
+.game-graph{
+  display:block;width:100%;
+  height:52px;min-height:52px;flex:none;
+  background:var(--panel-sunken);
   border-radius:var(--r-md);
   box-shadow:var(--e-1);
+  touch-action:pan-y;
 }
+.graph-tick{stroke:var(--line-soft);stroke-width:1}
+.graph-tick-label{fill:var(--ink-ghost);font-size:9px;font-family:var(--mono)}
 .graph-midline{stroke:var(--line);stroke-dasharray:3 4;stroke-width:1}
 .graph-area-white{fill:rgba(50,121,249,.13)}
 .graph-area-black{fill:rgba(18,19,23,.09)}
 .graph-line{stroke:var(--ink-faint);stroke-width:1.4}
 .graph-point{pointer-events:none;stroke:var(--panel);stroke-width:1;transition:r var(--t-fast) var(--ease)}
 .graph-cursor{stroke:var(--ink);stroke-width:1;opacity:.5}
-.graph-hit{fill:transparent;cursor:pointer;touch-action:pan-y}
+/* `pan-y` claimed the horizontal axis for scrubbing, so a swipe could
+   never reach the scroller around a chart wider than the screen. Both
+   axes go back to the browser; selection happens on a tap instead. */
+.graph-hit{fill:transparent;cursor:pointer;touch-action:pan-x pan-y}
 .graph-point-brilliant{fill:var(--c-brilliant)}
 .graph-point-great{fill:var(--c-great)}
 .graph-point-best{fill:var(--c-best)}
@@ -763,45 +825,30 @@ ul{list-style:none}
 .graph-point-miss{fill:var(--c-miss)}
 .graph-point-blunder{fill:var(--c-blunder)}
 
-/* ── Side panes ─────────────────────────────────────────── */
-
-.side{
-  min-height:0;min-width:0;
-  display:grid;grid-template-rows:auto minmax(0,1fr);
-  background:var(--panel);
-  box-shadow:0 -1px 0 var(--line-soft);
-}
-
-.pane-tabs{display:flex;gap:2px;padding:8px var(--gutter) 0;flex:none}
-.pane-tab{
-  flex:1;padding:7px 12px;
-  border-radius:var(--r-sm);
-  font-size:var(--fs-sm);font-weight:500;color:var(--ink-faint);
-  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
-}
-.pane-tab:hover{background:var(--tint);color:var(--ink)}
-.pane-tab.is-active{background:var(--primary);color:var(--on-primary)}
-
-.pane{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:var(--s-3) var(--gutter) var(--s-4)}
-.pane.is-collapsed{display:none}
-
 /* ── Insight card ───────────────────────────────────────── */
 
 .insight{
+  /* The explanation reads on the app's own ground now, not on an
+     inverted slab. Losing the surface means losing the `--on-inverse`
+     text colours with it, so this switches back to the normal ink ramp —
+     see the `.insight-*` rules below. */
   display:flex;flex-direction:column;gap:var(--s-3);
-  padding:var(--s-4);
-  border-radius:var(--r-lg);
-  background:var(--inverse);
-  color:var(--on-inverse);
-  box-shadow:0 1px 2px rgba(18,19,23,.14),0 10px 30px rgba(18,19,23,.12);
+  padding:var(--s-3) 0;
+  color:var(--ink);
 }
 
 .insight-top{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3)}
+.insight-threat{
+  margin-top:var(--s-2);padding-left:9px;
+  border-left:2px solid var(--c-miss);
+  color:var(--ink-soft);font-size:var(--fs-sm);line-height:1.45;
+}
+.insight-odds{display:block;margin-top:2px;font-family:var(--font);font-size:var(--fs-sm);font-weight:400;color:var(--ink-soft);letter-spacing:0}
 .insight-eval{
   font-family:var(--mono);font-variant-numeric:tabular-nums;
   font-size:26px;line-height:1;letter-spacing:-.5px;font-weight:500;
 }
-.insight-eval.is-waiting{font-family:var(--font);font-size:var(--fs-base);color:var(--on-inverse-soft);letter-spacing:0}
+.insight-eval.is-waiting{font-family:var(--font);font-size:var(--fs-base);color:var(--ink-soft);letter-spacing:0}
 .insight-badges{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
 
 .badge{
@@ -819,19 +866,18 @@ ul{list-style:none}
 .badge-mistake{background:var(--c-mistake)}
 .badge-miss{background:var(--c-miss)}
 .badge-blunder{background:var(--c-blunder)}
-.badge-motif{background:rgba(230,234,240,.1);color:var(--on-inverse-soft);box-shadow:inset 0 0 0 1px var(--line-inverse)}
+.badge-motif{background:var(--tint);color:var(--ink-soft);box-shadow:inset 0 0 0 1px var(--line-soft)}
 /* On the light stage head the same badges need a light-surface variant. */
-.stage-head .badge{box-shadow:0 1px 2px rgba(18,19,23,.12)}
 
-.insight-block{padding-top:var(--s-3);border-top:1px solid var(--line-inverse)}
+.insight-block{padding-top:var(--s-3);border-top:1px solid var(--line-soft)}
 .insight-kicker{
   display:flex;align-items:center;justify-content:space-between;gap:var(--s-2);
-  margin-bottom:5px;color:var(--on-inverse-faint);
+  margin-bottom:5px;color:var(--ink-faint);
   font-size:var(--fs-xs);letter-spacing:var(--ls-xs);text-transform:uppercase;font-weight:500;
 }
 .insight-title{font-size:var(--fs-md);font-weight:500;letter-spacing:var(--ls-md);margin-bottom:3px}
-.insight-summary{font-size:var(--fs-base);line-height:1.55;color:var(--on-inverse)}
-.insight-detail{margin-top:5px;color:var(--on-inverse-soft);font-size:var(--fs-sm);line-height:1.55}
+.insight-summary{font-size:var(--fs-base);line-height:1.55;color:var(--ink)}
+.insight-detail{margin-top:5px;color:var(--ink-soft);font-size:var(--fs-sm);line-height:1.55}
 .insight-warning{color:var(--c-inaccuracy)}
 
 /* Re-keyed on every move so the text arrives rather than swapping. */
@@ -842,22 +888,22 @@ ul{list-style:none}
   width:100%;padding:8px;
   border-radius:var(--r-pill);
   background:rgba(230,234,240,.06);
-  box-shadow:inset 0 0 0 1px var(--line-inverse);
-  color:var(--on-inverse-soft);font-size:var(--fs-sm);font-weight:500;
+  box-shadow:inset 0 0 0 1px var(--line-soft);
+  color:var(--ink-soft);font-size:var(--fs-sm);font-weight:500;
   transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease);
 }
 .deep-dive-btn:hover{background:rgba(47,111,228,.16);color:#9dc0ff;box-shadow:inset 0 0 0 1px rgba(47,111,228,.5)}
 
 .insight-meta{
   display:flex;justify-content:space-between;gap:var(--s-3);
-  padding-top:var(--s-2);border-top:1px solid var(--line-inverse);
-  color:var(--on-inverse-faint);
+  padding-top:var(--s-2);border-top:1px solid var(--line-soft);
+  color:var(--ink-faint);
   font-family:var(--mono);font-size:var(--fs-sm);letter-spacing:0;
 }
-.insight-meta strong{color:var(--on-inverse);font-weight:500}
+.insight-meta strong{color:var(--ink);font-weight:500}
 .insight-pv{
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  color:var(--on-inverse-faint);
+  color:var(--ink-faint);
   font-family:var(--mono);font-size:var(--fs-sm);letter-spacing:0;
 }
 
@@ -888,6 +934,144 @@ ul{list-style:none}
 .practice-line.practice-inaccurate .practice-title-verdict{color:var(--c-inaccuracy)}
 .practice-line.practice-poor .practice-title-verdict{color:var(--c-blunder)}
 .practice-reveal-inline{display:block;margin-top:var(--s-2);text-transform:none;letter-spacing:0;font-size:var(--fs-sm)}
+
+/* ── Larger windows ──────────────────────────────────────────
+   The shell is designed phone-first, so these only widen and
+   enlarge what is already there — no layout is introduced that
+   the small screen doesn't have. */
+@media (min-width: 860px) and (min-height: 700px){
+  .home-panel{max-width:640px}
+  .home-title{font-size:42px;line-height:46px}
+  .home-sub{font-size:var(--fs-lg)}
+  .home-step{padding:var(--s-4) var(--s-6) var(--s-6);gap:var(--s-4)}
+  .choice{padding:16px 16px 16px 15px}
+  .choice-icon{width:42px;height:42px}
+  .choice-icon svg{width:20px;height:20px}
+  .choice-title{font-size:var(--fs-lg)}
+}
+@media (min-width: 1200px) and (min-height: 800px){
+  .home-panel{max-width:720px}
+  .home-title{font-size:52px;line-height:56px}
+  .home{gap:var(--s-8)}
+}
+
+/* ── Statistics ─────────────────────────────────────────── */
+
+.stat-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:var(--s-2);margin-bottom:var(--s-2);
+}
+.stat-card{
+  display:flex;flex-direction:column;gap:2px;
+  padding:var(--s-3);border-radius:var(--r-md);
+  background:var(--panel-sunken);
+}
+.stat-value{font-size:var(--fs-title);font-weight:500;letter-spacing:-.4px;color:var(--ink)}
+.stat-name{font-size:var(--fs-sm);font-weight:500;color:var(--ink-soft)}
+/* The sentence that turns a number into something a beginner can act on. */
+.stat-help{font-size:var(--fs-xs);line-height:1.45;color:var(--ink-faint)}
+
+.opening-head{display:flex;align-items:baseline;gap:var(--s-2);flex-wrap:wrap}
+.opening-title{font-size:var(--fs-lg);font-weight:500;letter-spacing:-.2px}
+.opening-eco{
+  padding:1px 7px;border-radius:var(--r-pill);
+  background:var(--tint);color:var(--ink-faint);font-size:var(--fs-xs);
+}
+.opening-note{color:var(--ink-soft);font-size:var(--fs-sm);line-height:1.55}
+.opening-note strong{color:var(--ink);font-weight:500}
+
+/* ── Openings ───────────────────────────────────────────── */
+
+/* The connected account, standing in for the sign-in form. Reads as an
+   identity rather than an input, which is the whole point: a remembered
+   account should never look like it is being asked for again. */
+.connected-head{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:var(--s-3);
+  padding:var(--s-2) 0 var(--s-3);
+}
+.connected-id{display:flex;flex-direction:column;gap:1px;min-width:0}
+.connected-name{
+  font-size:var(--fs-lg);font-weight:500;letter-spacing:var(--ls-lg);
+  color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.connected-meta{font-size:var(--fs-sm);color:var(--ink-faint)}
+
+.opening-tag{
+  flex:none;min-width:0;padding:1px 8px;border-radius:var(--r-pill);
+  background:rgba(33,191,164,.12);color:var(--c-brilliant);
+  font-size:var(--fs-xs);font-weight:500;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40ch;
+}
+.opening-exit{opacity:.75}
+
+.opening-list{display:flex;flex-direction:column;gap:2px}
+.opening{
+  display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-3);
+  padding:8px 10px;border-radius:var(--r-sm);background:var(--panel);
+  box-shadow:inset 0 0 0 1px var(--line-soft);font-size:var(--fs-base);
+}
+.opening-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.opening-meta{flex:none;color:var(--ink-faint);font-size:var(--fs-sm)}
+
+/* ── Phases ─────────────────────────────────────────────── */
+
+.phases{margin-bottom:var(--s-3)}
+.phases .section-label{margin-bottom:6px}
+.phase-row{
+  display:flex;align-items:baseline;gap:var(--s-3);
+  padding:7px 9px;border-radius:var(--r-sm);
+  background:var(--panel);box-shadow:inset 0 0 0 1px var(--line-soft);
+  margin-bottom:2px;font-size:var(--fs-sm);
+}
+.phase-side{flex:none;font-weight:500;min-width:38px}
+.phase-cell{display:flex;align-items:baseline;gap:5px;flex:1;min-width:0}
+.phase-name{color:var(--ink-ghost);font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phase-value{flex:none;font-weight:500}
+
+/* ── Clock ──────────────────────────────────────────────── */
+
+.time-chip{
+  flex:none;padding:1px 7px;border-radius:var(--r-pill);
+  background:var(--tint);color:var(--ink-faint);
+  font-family:var(--mono);font-size:var(--fs-xs);
+}
+/* A move played on instinct is the interesting case, so it is the one
+   that gets colour. */
+.time-chip.is-rushed{background:rgba(232,163,61,.16);color:var(--c-inaccuracy)}
+
+.clocks{margin-bottom:var(--s-3)}
+.clocks .section-label{margin-bottom:6px}
+.clock-row{
+  display:flex;align-items:baseline;gap:var(--s-2);
+  padding:6px 9px;border-radius:var(--r-sm);
+  background:var(--panel);box-shadow:inset 0 0 0 1px var(--line-soft);
+  font-size:var(--fs-sm);margin-bottom:2px;
+}
+.clock-side{flex:none;font-weight:500;min-width:38px}
+.clock-stat{flex:none;color:var(--ink)}
+.clock-label{flex:none;color:var(--ink-ghost);font-size:var(--fs-xs)}
+.clock-rushed{flex:1;text-align:right;color:var(--ink-faint);font-size:var(--fs-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Turning points ─────────────────────────────────────── */
+
+.moments{margin-bottom:var(--s-3)}
+.moments .section-label{margin-bottom:6px}
+.moments-list{display:flex;flex-direction:column;gap:2px}
+.moment{
+  display:flex;align-items:baseline;gap:var(--s-2);width:100%;
+  padding:7px 9px;border-radius:var(--r-sm);
+  background:var(--panel);box-shadow:inset 0 0 0 1px var(--line-soft);
+  text-align:left;font-size:var(--fs-sm);
+  transition:background var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease);
+}
+.moment:hover{background:var(--panel-hover)}
+.moment.is-active{box-shadow:inset 0 0 0 1px var(--accent-line);background:var(--accent-soft)}
+.moment-dot{width:7px;height:7px;flex:none;border-radius:var(--r-pill);background:currentColor;align-self:center}
+.moment-move{flex:none;font-weight:500;color:var(--ink)}
+.moment-note{flex:1;min-width:0;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.moment-swing{flex:none;color:var(--ink-faint)}
 
 /* ── Accuracy ───────────────────────────────────────────── */
 
@@ -948,37 +1132,57 @@ ul{list-style:none}
    Portrait tablets and phones stay stacked, which suits a square
    board far better than a narrow split. */
 
-@media (min-width:900px){
+/* ═══════════════ Tablet — 768px and up ═══════════════
+   Enough width for two columns, so the readings that a phone puts behind
+   buttons become permanent. Same components, shown rather than hidden. */
+
+@media (min-width:768px){
   :root{--gutter:20px;--topbar-h:60px}
 
+  /* Two columns, so width is no longer the constraint the phone had.
+     360px is the widest the side column gets; the board takes what is
+     left of the viewport, still capped by height. */
   .review{
-    grid-template-rows:minmax(0,1fr);
-    grid-template-columns:minmax(0,1fr) minmax(300px,340px);
+    --board-size:min(
+      calc(100vw - 360px - (var(--gutter) * 3) - 16px),
+      74dvh
+    );
   }
-  .stage{padding-bottom:var(--s-2);--stage-w:calc(var(--board-px,100%) + 16px)}
-  .eval-rail{display:block}
-  .side{box-shadow:-1px 0 0 var(--line-soft)}
-  .game-graph{height:104px;min-height:104px;flex:none;height:60px}
+
+  .review{
+    grid-template-columns:minmax(0,1fr) minmax(300px,360px);
+    /* The board spans the first two rows so the move list beside it gets
+       the flexible one — insight is sized by its content, the list takes
+       whatever is left. Distinct areas: two elements sharing one area
+       would simply stack on top of each other. */
+    grid-template-rows:auto minmax(0,1fr) auto auto;
+    grid-template-areas:
+      "board   insight"
+      "board   detail"
+      "strip   detail"
+      "extras  detail";
+  }
+  /* On a phone the insight is the first thing on screen; here it is
+     beside the board. Either way it is read before anything else. */
+  .band-insight{
+    grid-area:insight;
+    max-height:42dvh;overflow-y:auto;
+    padding:var(--s-4) var(--gutter) 0;
+  }
+  .detail{
+    grid-area:detail;
+    display:flex;flex-direction:column;gap:var(--s-3);
+    min-height:0;
+    overflow-y:auto;overscroll-behavior:contain;
+    padding:var(--s-3) var(--gutter) var(--s-4);
+  }
 }
 
-/* ═══════════════ Desktop — 1280px and up ═══════════════
-   Room to drop the tab switch entirely: insight card and move list
-   stack in one column, only the move list scrolling. */
+/* ═══════════════ Desktop — 1280px and up ═══════════════ */
 
 @media (min-width:1280px){
   :root{--gutter:24px}
-  .review{grid-template-columns:minmax(0,1fr) minmax(360px,410px)}
-  .pane-tabs{display:none}
-  .side{grid-template-rows:minmax(0,1fr)}
-  .side.is-desktop{
-    display:flex;flex-direction:column;
-    padding:var(--s-4) var(--gutter);
-    gap:var(--s-3);overflow:hidden;
-  }
-  .side.is-desktop .pane{padding:0}
-  .side.is-desktop .pane.is-collapsed{display:block}
-  .side.is-desktop .pane-insight{flex:none;overflow:visible}
-  .side.is-desktop .pane-moves{flex:1 1 auto;min-height:0;overflow-y:auto}
+  .review{grid-template-columns:minmax(0,1fr) minmax(360px,420px)}
 }
 
 /* ═══════════════ Narrow top bar ═══════════════
@@ -999,10 +1203,599 @@ ul{list-style:none}
 
 @media (max-height:640px){
   :root{--topbar-h:48px}
-  .stage-head{display:none}
-  .graph-wrap{display:none}
+  /* Give the board the height instead of the strip. Navigation still
+     works — it is on the board itself. */
+  .move-strip{display:none}
 }
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+
+/* ── Piece field ─────────────────────────────────────────────
+   The website's drifting chess field, behind the whole shell.
+   Viewport-fixed rather than a child of any screen, so switching
+   between the menus and a review does not restart it, and so the
+   component can read pointer coordinates straight off the event
+   without a bounding-rect measurement per move. */
+.piece-field{
+  position:fixed;inset:0;
+  width:100%;height:100%;
+  z-index:0;
+  pointer-events:none;
+}
+/* Everything the app draws sits above the field. The topbar keeps its
+   own higher stacking so menus and popovers still clear the content. */
+.home,.review{position:relative;z-index:1}
+
+/* ── Performance tone ────────────────────────────────────────
+   A statistic reads as a colour before it reads as a number, which is
+   the point for a player who does not yet know what 72% accuracy means.
+   Green is doing well, amber is middling, red is the thing to work on;
+   the bands themselves live in `lib/tone.ts` so every surface judges the
+   same figure the same way. */
+.stat-card.is-good{
+  background:color-mix(in srgb, var(--c-best) 11%, var(--panel-sunken));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--c-best) 26%, transparent);
+}
+.stat-card.is-ok{
+  background:color-mix(in srgb, var(--c-inaccuracy) 11%, var(--panel-sunken));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--c-inaccuracy) 26%, transparent);
+}
+.stat-card.is-weak{
+  background:color-mix(in srgb, var(--c-blunder) 11%, var(--panel-sunken));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--c-blunder) 26%, transparent);
+}
+.stat-card.is-good .stat-value{color:var(--tone-good-ink)}
+.stat-card.is-ok .stat-value{color:var(--tone-ok-ink)}
+.stat-card.is-weak .stat-value{color:var(--tone-weak-ink)}
+
+/* Rows carry the same judgement as a severity stripe rather than a wash:
+   a list of openings has to stay scannable, and five tinted blocks in a
+   column would read as five different surfaces. */
+.row.is-good{box-shadow:inset 3px 0 0 var(--c-best)}
+.row.is-ok{box-shadow:inset 3px 0 0 var(--c-inaccuracy)}
+.row.is-weak{box-shadow:inset 3px 0 0 var(--c-blunder)}
+
+/* ── Screen entrance ─────────────────────────────────────────
+   The card already fades its whole step in. Staggering the step's own
+   children on top of that makes moving between home, library, statistics
+   and an opening feel like a screen arriving rather than content being
+   swapped underneath a static frame. */
+.home-step > *{
+  animation:step-in var(--t-enter) var(--ease-enter) both;
+  /* Never shrink. The step is a bounded flex column so it can scroll, and
+     a flex item's default `flex-shrink:1` makes it give up height instead
+     of overflowing into that scroll — measured on a 360x665 phone, the
+     openings list was squeezed to exactly 0px tall while its rows spilled
+     out of the clipped card, so the section rendered as nothing at all. */
+  flex:none;
+}
+.home-step > *:nth-child(1){animation-delay:20ms}
+.home-step > *:nth-child(2){animation-delay:55ms}
+.home-step > *:nth-child(3){animation-delay:90ms}
+.home-step > *:nth-child(4){animation-delay:125ms}
+.home-step > *:nth-child(5){animation-delay:160ms}
+.home-step > *:nth-child(6){animation-delay:195ms}
+.home-step > *:nth-child(7){animation-delay:230ms}
+.home-step > *:nth-child(n+8){animation-delay:265ms}
+
+@media (prefers-reduced-motion: reduce){
+  .home-step,
+  .home-step > *{animation:none}
+}
+
+/* ── Statistics on a phone ───────────────────────────────────
+   The card stacks value → name → help, which costs about 110px each
+   and pushed the openings list two screens down on a 360px device.
+   Setting the number beside its label instead roughly halves that,
+   without dropping the plain-language sentence that makes the figure
+   mean something to a beginner. */
+@media (max-width:599px){
+  .stat-card{
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+    grid-template-areas:
+      "value name"
+      "value help";
+    column-gap:var(--s-3);row-gap:1px;
+    align-items:center;
+  }
+  .stat-value{grid-area:value;align-self:center}
+  .stat-name{grid-area:name;align-self:end}
+  .stat-help{grid-area:help;align-self:start}
+  /* A card with no help sentence keeps the number vertically centred
+     against its label rather than hanging off the top row. */
+  .stat-card:not(:has(.stat-help)){grid-template-areas:"value name"}
+}
+
+/* ── Move strip ──────────────────────────────────────────────
+   The whole game as one self-scrolling row. This replaces both the
+   stepper and, on a phone, the vertical move list: the board already
+   steps on tap and jumps on double-tap, so a row of arrow buttons spent
+   44px on something the board does better. What the board cannot show is
+   where you are in the game, which is what this is for. */
+.move-strip{
+  grid-area:strip;
+  display:flex;gap:4px;
+  overflow-x:auto;overflow-y:hidden;
+  padding:0 var(--gutter) 2px;
+  scrollbar-width:none;
+}
+.move-strip::-webkit-scrollbar{display:none}
+
+.strip-item{
+  /* Full ink, not the soft ramp: measured 3.79:1 on the light theme's
+     tinted chip, under the 4.5 this size of text needs. The move number
+     beside it stays faint, so the hierarchy survives the change. */
+  color:var(--ink);
+  flex:none;
+  display:inline-flex;align-items:baseline;gap:5px;
+  padding:7px 10px;
+  border-radius:var(--r-sm);
+  background:var(--tint);
+  font-size:var(--fs-sm);font-weight:500;
+  white-space:nowrap;
+  transition:background var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);
+}
+.strip-item:hover{background:var(--tint-strong)}
+.strip-item .strip-no{font-size:var(--fs-xs);color:var(--ink-faint);font-family:var(--mono)}
+.strip-item.is-start{color:var(--ink-faint)}
+/* Two classes, so this beats the classification colour on the selected
+   move without an !important. */
+.strip-item.is-current{
+  background:var(--primary);color:var(--on-primary);
+  box-shadow:var(--e-1);
+}
+.strip-item.is-current .strip-no{color:var(--on-primary);opacity:.72}
+/* Beats the classification colour on the selected move without an
+   !important: three classes to its one. */
+.strip-item.is-current .strip-san{color:var(--on-primary)}
+
+/* ── Extras ──────────────────────────────────────────────────
+   The way into the readings that used to sit permanently in the layout. */
+.extras{
+  grid-area:extras;
+  display:flex;gap:var(--s-2);
+  padding:0 var(--gutter) var(--s-3);
+}
+.extra-btn{
+  flex:1;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:44px;
+  border-radius:var(--r-md);
+  background:var(--tint);
+  color:var(--ink-soft);
+  font-size:var(--fs-sm);font-weight:500;
+  box-shadow:inset 0 0 0 1px var(--line-soft);
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.extra-btn svg{width:16px;height:16px;fill:currentColor;flex:none}
+.extra-btn:hover:not(:disabled){background:var(--tint-strong);color:var(--ink)}
+.extra-btn:disabled{opacity:.38;cursor:default}
+
+/* ── Overlay ─────────────────────────────────────────────────
+   A sheet on a phone, a centred dialog from tablet up. */
+.overlay{
+  position:fixed;inset:0;z-index:60;
+  display:flex;align-items:flex-end;justify-content:center;
+  background:rgba(8,10,14,.5);
+  animation:overlay-in 150ms var(--ease-enter) both;
+}
+.overlay-panel{
+  width:100%;max-width:600px;max-height:84dvh;
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--panel);
+  border-radius:var(--r-xl) var(--r-xl) 0 0;
+  box-shadow:var(--e-3);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  animation:sheet-in 220ms var(--ease-enter) both;
+  outline:none;
+}
+@keyframes overlay-in{from{opacity:0}to{opacity:1}}
+@keyframes sheet-in{from{transform:translateY(14%)}to{transform:none}}
+
+.overlay-head{
+  flex:none;
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:var(--s-3);
+  padding:var(--s-4) var(--gutter) var(--s-2);
+}
+.overlay-titles{min-width:0;display:flex;flex-direction:column;gap:3px}
+.overlay-title{font-size:var(--fs-lg);font-weight:500;letter-spacing:var(--ls-lg);color:var(--ink)}
+.overlay-sub{font-size:var(--fs-sm);line-height:1.45;color:var(--ink-faint)}
+.overlay-body{
+  min-height:0;
+  overflow-y:auto;
+  /* Explicitly hidden: `overflow-y:auto` alone makes the x axis `auto`
+     too, so the panel scrolled sideways as a whole and the chart looked
+     like it was overflowing rather than scrolling inside itself. */
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  padding:0 var(--gutter) var(--s-5);
+}
+/* Given real height here, the curve is finally readable and its markers
+   are big enough to hit with a thumb. */
+.overlay-body .game-graph{height:168px;min-height:168px}
+
+.clock-current{margin-top:var(--s-3);font-size:var(--fs-sm);color:var(--ink-soft)}
+.clock-current strong{color:var(--ink);font-weight:500}
+.clock-current strong.is-rushed{color:var(--c-inaccuracy)}
+
+@media (min-width:768px){
+  .overlay{align-items:center;padding:var(--gutter)}
+  .overlay-panel{border-radius:var(--r-xl);max-height:80dvh}
+}
+
+
+/* ── Glass surfaces ──────────────────────────────────────────
+   One definition, three users. The inner top line is the specular
+   highlight that makes the material read as lit rather than merely
+   translucent; the hairline ring is its edge. */
+.glass{
+  background:var(--glass-fill);
+  backdrop-filter:var(--glass-blur);
+  -webkit-backdrop-filter:var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0 var(--glass-specular),
+    inset 0 0 0 1px var(--glass-edge),
+    var(--glass-shadow);
+}
+/* Without backdrop-filter the fill alone would leave the piece field
+   legible straight through the text, so it falls back to solid. */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))){
+  .glass{background:var(--panel)}
+}
+
+.topbar.glass{
+  border-radius:0;
+  box-shadow:
+    inset 0 -1px 0 var(--glass-edge),
+    0 2px 18px rgba(0,0,0,.10);
+}
+
+.band-insight{
+  margin-inline:var(--gutter);
+  padding:var(--s-3);
+  border-radius:var(--r-lg);
+}
+/* A sticky strip at the foot of the scroll area, fading the last line
+   into the card rather than cutting it off mid-sentence. A mask on the
+   element itself would fade the glass and its blurred edge with it, so
+   the gradient goes inside the scroller instead. Zero height when the
+   content fits, because there is nothing to scroll past. */
+.band-insight::after{
+  content:'';
+  position:sticky;bottom:calc(var(--s-3) * -1);
+  display:block;height:22px;margin-top:-22px;
+  background:linear-gradient(to top, var(--glass-fill), transparent);
+  pointer-events:none;
+}
+
+/* Denser than the inline glass. A modal is read on its own terms, and
+   at the band's transparency the board and explanation behind it ghosted
+   through the first few lines. */
+.overlay-panel.glass{
+  /* Nearly solid. At 86% the board and the explanation behind it still
+     ghosted through the first lines, which is the opposite of what the
+     glass is for here. */
+  background:color-mix(in srgb, var(--panel) 94%, transparent);
+  backdrop-filter:blur(30px) saturate(160%);
+  -webkit-backdrop-filter:blur(30px) saturate(160%);
+}
+.overlay-panel{border-radius:var(--r-xl) var(--r-xl) 0 0}
+@media (min-width:768px){
+  .overlay-panel{border-radius:var(--r-xl)}
+}
+
+/* ── Graph scroller ──────────────────────────────────────────
+   A long game gets width instead of compression, so its markers stay
+   far enough apart to tell apart and to hit with a thumb. */
+.graph-scroll{
+  overflow-x:auto;overflow-y:hidden;
+  overscroll-behavior-x:contain;
+  scrollbar-width:none;
+  margin-inline:calc(var(--gutter) * -1);
+  padding-inline:var(--gutter);
+}
+.graph-scroll::-webkit-scrollbar{display:none}
+.graph-track{display:block}
+
+/* "Turning points" sat hard against the chart above it. */
+.overlay-body .moments{margin-top:var(--s-5)}
+.overlay-body .phases{margin-top:var(--s-5)}
+.overlay-body .section-label{margin-bottom:var(--s-2);display:block}
+
+/* ── Best-move arrow ─────────────────────────────────────────
+   The arrow draws itself from the origin square to the target, head
+   last, then holds. It is the one thing a static arrow cannot do: pull
+   the eye in the direction the piece actually travels. Chessground's
+   shape layer uses an 8x8 viewBox, so a dash of 12 units is longer than
+   any arrow on the board and reveals the whole line exactly once. */
+.cg-wrap .cg-shapes line{
+  stroke-dasharray:12;
+  animation:arrow-draw 240ms var(--ease-enter) both;
+}
+@keyframes arrow-draw{
+  from{stroke-dashoffset:12}
+  to{stroke-dashoffset:0}
+}
+.cg-wrap .cg-shapes polygon{
+  transform-box:fill-box;transform-origin:center;
+  animation:arrow-head 140ms var(--ease-enter) 170ms both;
+}
+@keyframes arrow-head{
+  from{opacity:0;transform:scale(.55)}
+  to{opacity:1;transform:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .cg-wrap .cg-shapes line,
+  .cg-wrap .cg-shapes polygon{animation:none;stroke-dasharray:none}
+}
+
+
+/* ── Glass on the things you press and read ──────────────────
+   A lighter mix than the big surfaces: a shorter blur radius, and no
+   drop shadow, so a list of them reads as one material rather than a
+   stack of floating cards. Every one of these is a separately blurred
+   layer, which is the cost of the look — the planned setting to freeze
+   the background animation is what makes it cheap. */
+.choice,
+.row,
+.extra-btn,
+.strip-item,
+.moment,
+.stat-card{
+  background:var(--glass-fill);
+  backdrop-filter:blur(14px) saturate(160%);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 var(--glass-specular),
+    inset 0 0 0 1px var(--glass-edge);
+  border-radius:var(--r-md);
+}
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))){
+  .choice,.row,.extra-btn,.strip-item,.moment,.stat-card{background:var(--panel)}
+}
+
+/* The tinted statistic cards keep their meaning: the tone is the point,
+   so it sits on top of the glass rather than being replaced by it. */
+.stat-card.is-good{background:color-mix(in srgb, var(--c-best) 16%, var(--glass-fill))}
+.stat-card.is-ok{background:color-mix(in srgb, var(--c-inaccuracy) 16%, var(--glass-fill))}
+.stat-card.is-weak{background:color-mix(in srgb, var(--c-blunder) 16%, var(--glass-fill))}
+
+/* The selected move stays solid — it is the one thing on the strip that
+   must not be see-through. */
+.strip-item.is-current{
+  background:var(--primary);
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+  box-shadow:var(--e-1);
+}
+
+.choice:hover,.row:hover,.extra-btn:hover:not(:disabled),.strip-item:hover{
+  background:color-mix(in srgb, var(--panel) 78%, transparent);
+}
+
+/* The insight's expand control. Sits at the end of the summary rather
+   than in a corner, so it reads as "there is more of this sentence"
+   rather than as window chrome. */
+.insight-more{
+  align-self:flex-start;
+  display:inline-flex;align-items:center;gap:4px;
+  margin-top:2px;padding:4px 0;
+  color:var(--ink-faint);
+  font-size:var(--fs-sm);font-weight:500;
+}
+.insight-more:hover{color:var(--ink-soft)}
+.insight-more svg{
+  width:13px;height:13px;fill:currentColor;
+  transform:rotate(90deg);
+  transition:transform var(--t-base) var(--ease);
+}
+.insight-more svg.is-open{transform:rotate(-90deg)}
+
+
+/* ── Account menu ────────────────────────────────────────────
+   Hangs off the title, which is the thing it acts on. */
+.title-action{
+  display:inline-flex;align-items:center;gap:5px;min-width:0;
+  color:var(--ink);font-weight:500;
+}
+.title-action .players{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.title-action svg{
+  width:13px;height:13px;flex:none;fill:var(--ink-faint);
+  transition:transform var(--t-base) var(--ease);
+}
+.title-action svg.is-open{transform:rotate(180deg)}
+
+.menu-scrim{position:fixed;inset:0;z-index:39}
+.account-menu{
+  /* Absolute inside `.topbar-title`, so it hangs directly under the name
+     it acts on. Fixed-and-centred put it in the middle of the screen
+     while the title sat left of centre, which read as misaligned. */
+  position:absolute;z-index:40;
+  top:calc(100% + 8px);left:0;
+  min-width:200px;
+  border-radius:var(--r-md);
+  padding:5px;
+  animation:step-in var(--t-enter) var(--ease-enter) both;
+}
+.account-menu button{
+  display:block;width:100%;text-align:left;
+  padding:10px 12px;border-radius:var(--r-sm);
+  font-size:var(--fs-md);color:var(--ink);
+}
+.account-menu button:hover{background:var(--tint)}
+
+/* Position in the list, not a game id — it keeps your place while
+   scrolling a hundred rows. */
+.row-no{
+  flex:none;width:2.2ch;text-align:right;
+  color:var(--ink-faint);font-size:var(--fs-sm);
+  font-variant-numeric:tabular-nums;
+}
+
+/* ── Board palettes ──────────────────────────────────────────
+   Deliberately after the theme block, and deliberately the same in both
+   themes: a walnut board should look like walnut whether the app around
+   it is light or dark. Only two tokens are involved, which is why board
+   colours cost nothing to ship while extra piece sets would not. */
+:root[data-board="slate"]   { --board-light:#eef1f6; --board-dark:#aebbcc }
+:root[data-board="classic"] { --board-light:#f0d9b5; --board-dark:#b58863 }
+:root[data-board="ocean"]   { --board-light:#dce9f0; --board-dark:#7fa3b8 }
+:root[data-board="walnut"]  { --board-light:#e8d3b0; --board-dark:#8b5e3c }
+
+/* ── Settings ────────────────────────────────────────────────
+   One question per block: what it is, what it does in plain words, then
+   the choice itself. */
+.settings{gap:var(--s-5)}
+
+.setting{display:flex;flex-direction:column;gap:var(--s-2)}
+.setting-head{display:flex;flex-direction:column;gap:3px}
+.setting-label{font-size:var(--fs-lg);font-weight:500;letter-spacing:var(--ls-lg);color:var(--ink)}
+.setting-help{font-size:var(--fs-sm);line-height:1.5;color:var(--ink-faint)}
+
+.segmented{
+  display:flex;gap:3px;padding:3px;
+  border-radius:var(--r-md);
+  background:var(--glass-fill);
+  backdrop-filter:blur(14px) saturate(160%);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  box-shadow:inset 0 0 0 1px var(--glass-edge);
+}
+.segment{
+  flex:1;min-height:40px;padding:0 var(--s-2);
+  border-radius:var(--r-sm);
+  color:var(--ink-soft);font-size:var(--fs-md);font-weight:500;
+  transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.segment:hover{background:var(--tint);color:var(--ink)}
+.segment.is-active{background:var(--primary);color:var(--on-primary)}
+
+.board-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s-2)}
+.board-swatch{
+  display:flex;align-items:center;gap:var(--s-2);
+  padding:8px 10px;border-radius:var(--r-md);
+  background:var(--glass-fill);
+  backdrop-filter:blur(14px) saturate(160%);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  box-shadow:inset 0 0 0 1px var(--glass-edge);
+  color:var(--ink-soft);font-size:var(--fs-sm);font-weight:500;
+  transition:box-shadow var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.board-swatch.is-active{
+  color:var(--ink);
+  box-shadow:inset 0 0 0 2px var(--primary);
+}
+/* Two squares in the board's own colours — a better label than the name. */
+.swatch-tiles{display:grid;grid-template-columns:14px 14px;flex:none;border-radius:4px;overflow:hidden}
+.swatch-light,.swatch-dark{display:block;height:28px}
+.board-swatch[data-swatch="slate"]   .swatch-light{background:#eef1f6}
+.board-swatch[data-swatch="slate"]   .swatch-dark {background:#aebbcc}
+.board-swatch[data-swatch="classic"] .swatch-light{background:#f0d9b5}
+.board-swatch[data-swatch="classic"] .swatch-dark {background:#b58863}
+.board-swatch[data-swatch="ocean"]   .swatch-light{background:#dce9f0}
+.board-swatch[data-swatch="ocean"]   .swatch-dark {background:#7fa3b8}
+.board-swatch[data-swatch="walnut"]  .swatch-light{background:#e8d3b0}
+.board-swatch[data-swatch="walnut"]  .swatch-dark {background:#8b5e3c}
+
+.setting-note{
+  margin-top:var(--s-2);
+  font-size:var(--fs-sm);line-height:1.5;color:var(--ink-faint);
+}
+
+/* Explains only the arrow colours currently on the board. */
+.arrow-key{
+  display:flex;flex-wrap:wrap;gap:4px var(--s-3);
+  margin-top:var(--s-2);
+  font-size:var(--fs-sm);color:var(--ink-faint);
+}
+.arrow-key li{display:flex;align-items:center;gap:6px}
+.arrow-dot{
+  width:9px;height:9px;flex:none;border-radius:2px;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.2);
+}
+.arrow-dot.is-green{background:#3f9c4a}
+.arrow-dot.is-blue{background:#3279f9}
+.arrow-dot.is-yellow{background:#d9a441}
+.arrow-dot.is-red{background:#c0392b}
+
+/* Each service in its own colour, so the row is recognisable before the
+   name is read. */
+.choice-icon.is-lichess{background:rgba(232,235,241,.10);box-shadow:inset 0 0 0 1px rgba(232,235,241,.22)}
+.choice-icon.is-lichess svg{fill:#e8ebf1}
+:root:not([data-theme="dark"]) .choice-icon.is-lichess{background:rgba(18,19,23,.07);box-shadow:inset 0 0 0 1px rgba(18,19,23,.16)}
+:root:not([data-theme="dark"]) .choice-icon.is-lichess svg{fill:#2b2f36}
+.choice-icon.is-chesscom{background:rgba(129,175,85,.15);box-shadow:inset 0 0 0 1px rgba(129,175,85,.34)}
+.choice-icon.is-chesscom svg{fill:#81af55}
+
+/* ── Language picker ─────────────────────────────────────────
+   A list rather than segments: there are more of these than fit a row,
+   and each carries a second line. */
+.language-list{display:flex;flex-direction:column;gap:4px}
+.language{
+  display:flex;align-items:baseline;gap:var(--s-2);
+  width:100%;padding:11px 12px;
+  border-radius:var(--r-md);
+  background:var(--glass-fill);
+  backdrop-filter:blur(14px) saturate(160%);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  box-shadow:inset 0 0 0 1px var(--glass-edge);
+  text-align:left;color:var(--ink-soft);
+  transition:box-shadow var(--t-fast) var(--ease),color var(--t-fast) var(--ease);
+}
+.language:hover:not(:disabled){color:var(--ink)}
+.language:disabled{opacity:.55}
+.language.is-active{color:var(--ink);box-shadow:inset 0 0 0 2px var(--primary)}
+.language-name{font-size:var(--fs-md);font-weight:500}
+.language-english{font-size:var(--fs-sm);color:var(--ink-faint)}
+.language-state{margin-left:auto;font-size:var(--fs-sm);color:var(--ink-faint)}
+
+/* ── First-run download ───────────────────────────────────────────────
+   The one screen a fresh install opens on. It has a single job — explain
+   what is about to be fetched and how large it is — so it is narrow,
+   centred, and carries nothing else. */
+/* Centred rather than top-anchored: this screen holds one short
+   message and one button, and pinned to the top it leaves the lower two
+   thirds of a phone empty. */
+.home:has(.home-step.gate){justify-content:center}
+.gate{
+  max-width:460px;margin-inline:auto;gap:var(--s-4);
+  padding:var(--s-6);border-radius:var(--r-lg);
+  /* Glass, like every other readable surface in the app — this one is
+     read before anything else in it, so it should not be the exception. */
+  overflow:visible;flex:0 1 auto;
+}
+.gate-title{font-size:var(--fs-title);line-height:var(--lh-title);letter-spacing:var(--ls-title);font-weight:640;color:var(--ink);margin:0}
+.gate-lede{margin:0;color:var(--ink-soft);font-size:var(--fs-sm);line-height:1.55}
+
+.gate-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.gate-item{
+  display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-3);
+  padding:11px 0;font-size:var(--fs-sm);
+  /* A hairline between rows rather than a box around each: this is one
+     list, not a set of unrelated cards. */
+  box-shadow:inset 0 -1px 0 var(--line);
+}
+.gate-item:last-child{box-shadow:none}
+.gate-item-name{color:var(--ink)}
+.gate-item-size{color:var(--ink-faint);font-variant-numeric:tabular-nums}
+
+.gate-progress{display:flex;flex-direction:column;gap:8px}
+.gate-bar{
+  height:6px;border-radius:999px;overflow:hidden;
+  background:color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.gate-bar-fill{
+  display:block;height:100%;border-radius:inherit;background:var(--primary);
+  transition:width .25s var(--ease-enter);
+}
+.gate-progress-text{
+  margin:0;color:var(--ink-soft);font-size:var(--fs-sm);
+  font-variant-numeric:tabular-nums;
+}
+.gate-note{margin:0;color:var(--ink-faint);font-size:var(--fs-xs);line-height:var(--lh-xs)}
+
+@media (prefers-reduced-motion:reduce){
+  .gate-bar-fill{transition:none}
 }
