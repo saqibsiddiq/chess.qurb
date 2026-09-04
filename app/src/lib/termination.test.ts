@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { fromLichessStatus, outcomeFor, terminationFrom } from './termination';
 
 describe('terminationFrom', () => {
-  // The exact sentences Chess.com writes, sampled from their live API.
   test.each([
     ['Hikaru won by resignation', 'resignation'],
     ['Hikaru won by checkmate', 'checkmate'],
@@ -19,8 +18,6 @@ describe('terminationFrom', () => {
   });
 
   test('prefers the status when the header only says Normal', () => {
-    // Lichess's PGN cannot tell a resignation from a checkmate — both are
-    // "Normal" — so the status field is the only way to distinguish them.
     expect(terminationFrom({ Termination: 'Normal' }, 'resign')).toBe('resignation');
     expect(terminationFrom({ Termination: 'Normal' }, 'mate')).toBe('checkmate');
   });
@@ -30,8 +27,6 @@ describe('terminationFrom', () => {
   });
 
   test('does not let a vague status override an explicit header', () => {
-    // The header is the more specific source; a mismatched status must
-    // not rewrite a stated timeout into something else.
     expect(terminationFrom({ Termination: 'Time forfeit' }, 'resign')).toBe('timeout');
   });
 

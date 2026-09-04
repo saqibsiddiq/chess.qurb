@@ -82,7 +82,6 @@ describe('fetchChessComGames', () => {
     const games = await fetchChessComGames('alice', 1);
     expect(games).toHaveLength(1);
     expect(games[0]).toMatchObject({ id: 'g1-uuid', white: 'alice', black: 'bob', result: '1-0', timeControl: 'blitz' });
-    // Stopped once `max` was reached, without walking further back to January.
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -92,8 +91,6 @@ describe('fetchChessComGames', () => {
   });
 
   test('widens to a parallel batch when the newest month is too thin', async () => {
-    // Four months of archives; the newest is empty, so one month is not
-    // enough and the fetcher has to reach further back.
     const archives = { archives: ['…/2023/11', '…/2023/12', '…/2024/01', '…/2024/02'] };
     const emptyMonth = { games: [] };
     const gameIn = (id: string) => ({
@@ -114,7 +111,7 @@ describe('fetchChessComGames', () => {
     globalThis.fetch = vi
       .fn()
       .mockResolvedValueOnce(ok(archives))
-      .mockResolvedValueOnce(ok(emptyMonth)) // newest month, fetched alone
+      .mockResolvedValueOnce(ok(emptyMonth))
       .mockResolvedValueOnce(ok(gameIn('jan')))
       .mockResolvedValueOnce(ok(emptyMonth))
       .mockResolvedValueOnce(ok(emptyMonth));
@@ -123,9 +120,6 @@ describe('fetchChessComGames', () => {
 
     expect(games).toHaveLength(1);
     expect(games[0]).toMatchObject({ id: 'jan-uuid' });
-    // 1 archives + 1 lone newest month + a 3-wide batch for the rest.
-    // The point is that those three went out together rather than
-    // costing three separate sequential round trips.
     expect(globalThis.fetch).toHaveBeenCalledTimes(5);
   });
 
@@ -136,8 +130,8 @@ describe('fetchChessComGames', () => {
     globalThis.fetch = vi
       .fn()
       .mockResolvedValueOnce(ok(archives))
-      .mockResolvedValueOnce(ok({ games: [] })) // newest month, empty
-      .mockRejectedValueOnce(new Error('network blip')) // Jan fails outright
+      .mockResolvedValueOnce(ok({ games: [] }))
+      .mockRejectedValueOnce(new Error('network blip'))
       .mockResolvedValueOnce(
         ok({
           games: [

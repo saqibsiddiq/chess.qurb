@@ -23,8 +23,6 @@ function summary(over: Partial<ReviewSummary>): ReviewSummary {
 
 describe('detectPlayer', () => {
   test('picks the name that recurs across the library', () => {
-    // alice appears in all three, on both sides — the signature of
-    // someone reviewing their own games.
     const games = [
       summary({ white: 'alice', black: 'bob' }),
       summary({ white: 'carol', black: 'alice' }),
@@ -70,21 +68,20 @@ describe('aggregate', () => {
 
     const insights = aggregate(games, 'alice')!;
 
-    // The opponent's 9 blunders and 7 forks must not leak in.
     expect(insights.games).toBe(2);
-    expect(insights.perGame.blunder).toBeCloseTo(1.5, 5); // (2 + 1) / 2
-    expect(insights.perGame.mistake).toBeCloseTo(1.5, 5); // (0 + 3) / 2
+    expect(insights.perGame.blunder).toBeCloseTo(1.5, 5);
+    expect(insights.perGame.mistake).toBeCloseTo(1.5, 5);
     expect(insights.weaknesses[0]).toMatchObject({ motif: 'hanging_piece', count: 3 });
     expect(insights.weaknesses.map((w) => w.motif)).not.toContain('fork');
   });
 
   test('scores results from the player’s own side', () => {
     const games = [
-      summary({ white: 'alice', black: 'bob', result: '1-0' }), // alice wins
-      summary({ white: 'carol', black: 'alice', result: '1-0' }), // alice loses
+      summary({ white: 'alice', black: 'bob', result: '1-0' }),
+      summary({ white: 'carol', black: 'alice', result: '1-0' }),
       summary({ white: 'alice', black: 'dave', result: '1/2-1/2' }),
-      summary({ white: 'eve', black: 'alice', result: '0-1' }), // alice wins
-      summary({ white: 'alice', black: 'finn', result: '*' }), // unfinished
+      summary({ white: 'eve', black: 'alice', result: '0-1' }),
+      summary({ white: 'alice', black: 'finn', result: '*' }),
     ];
     const insights = aggregate(games, 'alice')!;
     expect(insights).toMatchObject({ games: 5, wins: 2, draws: 1, losses: 1 });
@@ -99,8 +96,6 @@ describe('aggregate', () => {
   });
 
   test('excludes delivered checkmates from weaknesses', () => {
-    // `mate` marks a checkmate the player delivered — listing it as a
-    // weakness would be exactly backwards.
     const games = [
       summary({ white: 'alice', whiteMotifs: { mate: 3, hanging_piece: 1 } }),
     ];

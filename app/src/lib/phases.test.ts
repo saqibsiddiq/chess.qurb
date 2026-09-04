@@ -2,10 +2,9 @@ import { describe, expect, test } from 'vitest';
 import { phaseAccuracy, phasesFor } from './phases';
 import type { GameReview, ReviewedMove } from './reviewEngine';
 
-/** Positions with progressively less material, for phase boundaries. */
 const FULL = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-const MIDDLE = 'r3k2r/pp3ppp/8/8/8/8/PP3PPP/R3K2R w KQkq - 0 1'; // 2R + 6P a side = 32
-const BARE = '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1'; // one pawn
+const MIDDLE = 'r3k2r/pp3ppp/8/8/8/8/PP3PPP/R3K2R w KQkq - 0 1';
+const BARE = '4k3/8/8/8/8/8/4P3/4K3 w - - 0 1';
 
 function move(color: 'w' | 'b', fenAfter: string, cp: number): ReviewedMove {
   return {
@@ -37,12 +36,10 @@ describe('phasesFor', () => {
 
   test('falls back to a ply count when book data is missing', () => {
     const r = review(Array.from({ length: 4 }, (_, i) => move(i % 2 ? 'b' : 'w', FULL, 0)));
-    // Short game, no book exit: everything is still opening.
     expect(phasesFor(r, null).every((p) => p === 'opening')).toBe(true);
   });
 
   test('uses material, not move number, to find the endgame', () => {
-    // Position 2 still has rooks and pawns; position 3 is down to a pawn.
     const r = review([
       move('w', FULL, 0),
       move('b', MIDDLE, 0),
@@ -50,8 +47,6 @@ describe('phasesFor', () => {
     ]);
     const phases = phasesFor(r, 1);
     expect(phases[1]).toBe('middlegame');
-    // A queenless grind can reach an endgame early, which a move-number
-    // boundary would miss entirely.
     expect(phases[2]).toBe('endgame');
   });
 });
@@ -60,12 +55,10 @@ describe('phaseAccuracy', () => {
   test('scores only the requested colour', () => {
     const r = review([
       move('w', FULL, 0),
-      move('b', FULL, -600), // Black's own doing
+      move('b', FULL, -600),
       move('w', FULL, 0),
     ]);
     const white = phaseAccuracy(r, phasesFor(r, 0), 'w');
-    // White never lost ground, so White's figure must be unaffected by
-    // Black's collapse.
     expect(white[0].accuracy).toBeGreaterThan(95);
   });
 
@@ -81,8 +74,6 @@ describe('phaseAccuracy', () => {
   });
 
   test('omits phases the game never reached', () => {
-    // Reporting 0% for a phase that was never played reads as playing it
-    // terribly rather than not playing it at all.
     const r = review([move('w', FULL, 0), move('b', FULL, 0)]);
     const result = phaseAccuracy(r, phasesFor(r, 10), 'w');
     expect(result.map((p) => p.phase)).toEqual(['opening']);
@@ -92,7 +83,7 @@ describe('phaseAccuracy', () => {
     const r = review([
       move('w', FULL, 0),
       move('b', FULL, 0),
-      move('w', BARE, -900), // White throws it away in the endgame
+      move('w', BARE, -900),
       move('b', BARE, -900),
     ]);
     const result = phaseAccuracy(r, phasesFor(r, 2), 'w');

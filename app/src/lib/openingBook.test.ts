@@ -9,9 +9,6 @@ describe('isBookMove', () => {
   });
 
   test('rejects a move not present at that position', () => {
-    // g1a1 isn't even a legal knight move, but isBookMove only does a
-    // lookup — it should just correctly report "not in the book" rather
-    // than throwing.
     expect(isBookMove(startingFen, 'g1a1')).toBe(false);
   });
 

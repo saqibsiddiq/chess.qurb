@@ -71,8 +71,6 @@ export interface MoveExplanation {
   shapes: BoardShape[];
 }
 
-// Exported so practice mode names the attacking piece with the same
-// vocabulary the review uses.
 export const PIECE_NAMES: Record<PieceSymbol, string> = {
   p: 'pawn',
   n: 'knight',
@@ -82,7 +80,6 @@ export const PIECE_NAMES: Record<PieceSymbol, string> = {
   k: 'king',
 };
 
-// Standard pawn-unit values, used for sacrifice detection (Brilliant).
 export const PIECE_VALUES: Record<PieceSymbol, number> = {
   p: 1,
   n: 3,
@@ -130,24 +127,14 @@ function formatLoss(lossCp: number): string {
   return (lossCp / 100).toFixed(2);
 }
 
-// Uniquely (and stably) identifies one ply, for seeding pickVariant() —
-// the same move always gets the same phrasing on repeat views; only
-// different moves land on different wording.
 function moveSeed(move: ParsedMove, tag: string): string {
   return `${move.color}${move.moveNumber}:${move.uci}:${tag}`;
 }
 
-// Joins two independently-picked, independently-complete sentences into
-// one summary — see explanationVariants.ts for why composing two small
-// pools this way covers far more combinations than one large flat pool.
 function compose(opener: string, consequence: string): string {
   return `${opener} ${consequence}`;
 }
 
-// Plain-language framing for the generic positional-loss case, so the
-// headline sentence reads like a coach talking, not a data readout — the
-// precise pawn figure is still shown, just as supporting detail rather
-// than the main point.
 function severityWord(classification: Classification): string {
   switch (classification) {
     case 'mistake':
@@ -162,8 +149,8 @@ function severityWord(classification: Classification): string {
 }
 
 function squareToCoords(sq: Square): [number, number] {
-  const file = sq.charCodeAt(0) - 97; // 'a' -> 0
-  const rank = sq.charCodeAt(1) - 49; // '1' -> 0
+  const file = sq.charCodeAt(0) - 97;
+  const rank = sq.charCodeAt(1) - 49;
   return [file, rank];
 }
 
@@ -234,13 +221,6 @@ function detectLineMotif(board: Chess, start: Square, color: Color): LineMotifRe
     const behindResult = findNextPieceAlongRay(board, frontResult.square, direction);
     if (!behindResult || behindResult.piece.color !== enemy) continue;
 
-    // A pin is a line attack on an enemy piece with a more valuable
-    // enemy piece behind it. King/queen/rook are the high-priority targets
-    // used by this dataset's motif vocabulary. A king can't itself be
-    // pinned (it's forced to move out of any attack regardless), so a
-    // king-in-front case is excluded here and left to the skewer check
-    // below — otherwise a real skewer through the king would get
-    // misclassified as a pin whenever the piece behind is q/r/k too.
     if (frontResult.piece.type !== 'k' && ['k', 'q', 'r'].includes(behindResult.piece.type)) {
       return {
         type: 'pin',
@@ -252,7 +232,6 @@ function detectLineMotif(board: Chess, start: Square, color: Color): LineMotifRe
       };
     }
 
-    // A skewer is the reverse ordering: king in front, valuable piece behind.
     if (frontResult.piece.type === 'k' && behindResult.piece.type !== 'p') {
       return {
         type: 'skewer',
@@ -316,8 +295,6 @@ function detectBackRank(board: Chess, color: Color): { kingSquare: Square } | nu
   const backRank = enemy === 'w' ? 0 : 7;
   if (rank !== backRank) return null;
 
-  // Require a rook/queen checking line. This avoids classifying ordinary
-  // knight/bishop checks on the back rank as back-rank motifs.
   const checkers = board.attackers(enemyKing.square, enemy === 'w' ? 'b' : 'w');
   const hasSlidingChecker = checkers.some((square) => {
     const piece = board.get(square);
@@ -330,7 +307,6 @@ function detectBackRank(board: Chess, color: Color): { kingSquare: Square } | nu
   );
   if (kingMoves.length > 0) return null;
 
-  // Require the king zone to be substantially occupied by its own pieces.
   const [kingFile, kingRank] = squareToCoords(enemyKing.square);
   let friendlyBlockers = 0;
 
@@ -370,19 +346,14 @@ export function detectNewlyHangingPiece(
     const attackers = after.attackers(square, opponent);
     const defenders = after.attackers(square, color);
 
-    // Conservative definition: attacked and completely undefended.
     if (attackers.length === 0 || defenders.length > 0) continue;
 
     const wasAttackers = before.attackers(square, opponent);
     const wasDefenders = before.attackers(square, color);
     const wasHanging = wasAttackers.length > 0 && wasDefenders.length === 0;
 
-    // Only report a newly-created hanging piece. This prevents unrelated
-    // pre-existing weaknesses from being blamed on the current move.
     if (wasHanging) continue;
 
-    // If the move placed the piece there, or changed another piece so that
-    // it became newly undefended/attacked, this is a causal result of the move.
     if (square === movedTo || attackers.some((a) => !wasAttackers.includes(a)) ||
         wasDefenders.length > 0) {
       return {
@@ -406,7 +377,6 @@ function detectFork(
   if (!piece) return null;
   const opponent: Color = color === 'w' ? 'b' : 'w';
 
-  // Find all attacked squares from this piece
   const attackedSquares: Square[] = [];
   for (let f = 0; f < 8; f++) {
     for (let r = 0; r < 8; r++) {
@@ -442,13 +412,6 @@ export interface MissedTacticResult {
   shapes: BoardShape[];
 }
 
-/**
- * Facts about a tactical opportunity the played move let slip: a forced
- * mate, or a fork/pin/skewer available via the engine's best move. Computed
- * independently of classification (unlike the rest of this file) so
- * reviewEngine.ts's classify() can consult it when deciding Miss — see
- * ml/specs/review_contract.md section 9 (Chesy approximation).
- */
 export function detectMissedTactic(
   move: ParsedMove,
   beforeFen: string,
@@ -539,20 +502,11 @@ export function detectMissedTactic(
       };
     }
   } catch {
-    // bestMove might not be legal to replay in edge cases
   }
 
   return null;
 }
 
-/**
- * What the side to move is threatening in a position.
- *
- * Explanations otherwise only describe what the player's own move did.
- * Just as instructive is what is now coming *at* them — and the detectors
- * already take a colour, so this is the same machinery pointed the other
- * way rather than a second implementation.
- */
 export function describeThreat(fenAfter: string): string | null {
   let board: Chess;
   try {
@@ -561,12 +515,9 @@ export function describeThreat(fenAfter: string): string | null {
     return null;
   }
 
-  // Whoever is to move is the one with the threat.
   const attacker = board.turn();
   const defender: Color = attacker === 'w' ? 'b' : 'w';
 
-  // A piece the defender has left hanging is the most concrete threat
-  // there is: it can simply be taken.
   const loose = board
     .board()
     .flat()
@@ -605,24 +556,14 @@ export function explainMove(
   const isWhite = move.color === 'w';
   const bestMove = moveFromUci(analysisBefore.bestMove);
 
-  // Every branch below builds its own complete, intentional shape set —
-  // nothing is pre-accumulated here. A shared "always show the engine's
-  // best move" base used to get combined with branch-specific arrows
-  // (e.g. a missed fork's yellow arrows plus a redundant green one from
-  // essentially the same square), which is what actually made arrows
-  // look cluttered/confusing rather than any square being invalid.
   const bestMoveArrow: BoardShape[] = bestMove ? [{ orig: bestMove.from, dest: bestMove.to, brush: 'green' }] : [];
 
-  /** The move actually played, drawn only where it differs from the best
-   *  one. Two arrows in different colours answer "what did I do" and
-   *  "what should I have done" at a glance, which one arrow cannot. */
   const playedArrow: BoardShape[] = (() => {
     if (move.uci === analysisBefore.bestMove) return [];
     const played = moveFromUci(move.uci);
     return played ? [{ orig: played.from, dest: played.to, brush: 'blue' as const }] : [];
   })();
 
-  // 1. Immediate Checkmate Played
   if (afterBoard.isCheckmate()) {
     const parsed = moveFromUci(move.uci);
     return {
@@ -634,7 +575,6 @@ export function explainMove(
     };
   }
 
-  // 2. Missed Mate / Allowed Mate
   const opponentMate =
     evalAfterMate !== undefined &&
     evalAfterMate !== null &&
@@ -646,7 +586,6 @@ export function explainMove(
       summary: missedTactic.summary,
       detail: missedTactic.detail,
       motif: 'missed_mate',
-      // The one thing worth pointing at is the mating move itself.
       shapes: bestMoveArrow,
     };
   }
@@ -658,12 +597,10 @@ export function explainMove(
       summary: pickVariant(moveSeed(move, 'allowed_mate:summary'), allowedMateSummaries)(move.san),
       detail: pickVariant(moveSeed(move, 'allowed_mate:detail'), allowedMateDetails)(bestSan),
       motif: 'allowed_mate',
-      // Where the danger came from, plus the defense that avoided it.
       shapes: [...(parsed ? [{ orig: parsed.to, brush: 'red' as const }] : []), ...bestMoveArrow],
     };
   }
 
-  // 3. Hanging / Under-defended Material
   const hanging = detectNewlyHangingPiece(beforeBoard, afterBoard, move.uci, move.color);
   if (
     hanging &&
@@ -676,9 +613,6 @@ export function explainMove(
     if (hanging.attackerSquare) {
       hangingShapes.push({ orig: hanging.attackerSquare, dest: hanging.square, brush: 'red' });
     }
-    // Naming the actual attacker (not just "vulnerable") is the concrete,
-    // checkable reason a piece is hanging — a player can go verify it on
-    // the board immediately, rather than taking the label on faith.
     const attackerPiece = hanging.attackerSquare ? afterBoard.get(hanging.attackerSquare) : null;
     const attackerName = attackerPiece ? PIECE_NAMES[attackerPiece.type] : null;
     return {
@@ -702,16 +636,10 @@ export function explainMove(
       detail: pickVariant(moveSeed(move, 'hanging:detail'), hangingDetails)({ bestSan, lossText }),
       motif: 'hanging_piece',
       motifDetail: { piece: hanging.name, square: hanging.square },
-      // What's hanging and to whom, plus what avoids it — two arrows
-      // with clearly different colors/meanings, not redundant.
       shapes: [...hangingShapes, ...bestMoveArrow],
     };
   }
 
-  // 4, 5 & 6. Missed fork / pin / skewer (by the engine's best move, not the
-  // move actually played) — facts already computed by detectMissedTactic()
-  // in reviewEngine.ts's classify() pass, reused here for narration instead
-  // of re-simulating the best move.
   const tacticGateOpen =
     classification === 'inaccuracy' ||
     classification === 'mistake' ||
@@ -728,24 +656,14 @@ export function explainMove(
       detail: missedTactic.detail,
       motif: missedTactic.motif,
       motifDetail: missedTactic.motifDetail,
-      // The green arrow is not redundant here, which an earlier pass
-      // assumed when it removed it. The tactic's yellow arrows fan out
-      // from `bestMove.to` — a square that is *empty in the position on
-      // screen*, because the best move has not been played. Drawing the
-      // move that gets a piece there is what makes the rest legible:
-      // green says "play this", yellow says "and it hits these".
       shapes: [...bestMoveArrow, ...missedTactic.shapes],
     };
   }
 
   const playedMove = moveFromUci(move.uci);
   if (playedMove) {
-    // 7. Discovered Attack
     const discovered = detectDiscoveredAttack(beforeBoard, afterBoard, playedMove, move.color === 'w' ? 'b' : 'w');
     if (discovered) {
-      // Naming the actual attacking piece (bishop/rook/queen) instead of a
-      // generic "slider" label — a player can look at the board and see
-      // exactly which piece is doing the attacking.
       const attackerPiece = afterBoard.get(discovered.attackerSquare);
       const attackerName = attackerPiece ? PIECE_NAMES[attackerPiece.type] : 'piece';
       return {
@@ -766,7 +684,6 @@ export function explainMove(
       };
     }
 
-    // 8. Back Rank Weakness
     const backRank = detectBackRank(afterBoard, move.color === 'w' ? 'b' : 'w');
     if (backRank) {
       return {
@@ -783,9 +700,6 @@ export function explainMove(
     }
   }
 
-  // 9. Positive classifications — only point at the engine's move when it
-  // differs from what was actually played; if they're the same move,
-  // there's nothing to point to.
   const positiveShapes = move.uci === analysisBefore.bestMove ? [] : bestMoveArrow;
 
   if (classification === 'brilliant') {
@@ -834,7 +748,6 @@ export function explainMove(
     };
   }
 
-  // 10. General positional loss
   return {
     title: 'Evaluation shifted',
     summary: pickVariant(moveSeed(move, 'fallback:summary'), fallbackSummaries)({

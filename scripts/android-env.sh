@@ -8,7 +8,7 @@
 #
 #   * `llama-cpp-sys-2` looks for the NDK under ANDROID_NDK, then
 #     ANDROID_NDK_ROOT, then NDK_ROOT. If none is usable its build script
-#     panics with "Android NDK path does not exist:" and no path — and it
+#     panics with "Android NDK path does not exist:" and no path, and it
 #     only runs when something forces it to rebuild, so a stale build
 #     directory can hide the problem for several builds in a row.
 #   * It defaults to API level 28 when ANDROID_API_LEVEL is unset, which
@@ -34,7 +34,7 @@
 #     black screen, with nothing in the logs to say why.
 #
 # With no device connected it silently falls back to opening Android
-# Studio, which is not installed here — so check `adb devices` first.
+# Studio, which is not installed here, so check `adb devices` first.
 
 # Adjust these three paths if the toolchains live elsewhere.
 

@@ -15,8 +15,6 @@ describe('tone bands', () => {
   });
 
   it('separates real club-player accuracies rather than lumping them', () => {
-    // The bands only earn their place if typical figures land in
-    // different ones — 60s and 80s must not both read as the same colour.
     expect(accuracyTone(62)).toBe('weak');
     expect(accuracyTone(72)).toBe('ok');
     expect(accuracyTone(86)).toBe('good');

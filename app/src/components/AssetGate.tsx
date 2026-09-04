@@ -1,15 +1,6 @@
 import { useT } from '../lib/i18n';
 import { assetTitle, formatBytes, type AssetsView } from '../lib/assets';
 
-/**
- * First-run download screen.
- *
- * The app ships without the engine's neural networks — they are 107MB of
- * a 109MB engine — so on a fresh install there is one thing to fetch
- * before a game can be reviewed. This screen exists to make that a
- * deliberate, explained step rather than a silent 100MB download on a
- * phone's mobile data.
- */
 export default function AssetGate({ assets }: { assets: AssetsView }) {
   const t = useT();
   const { missing, missingBytes, downloading, progress, error, install } = assets;
@@ -39,9 +30,7 @@ export default function AssetGate({ assets }: { assets: AssetsView }) {
 
           {downloading ? (
             <div className="gate-progress">
-              {/* A determinate bar, because the size is known up front and
-                  a 100MB download over a phone connection is long enough
-                  that a spinner would read as a hang. */}
+              {}
               <div
                 className="gate-bar"
                 role="progressbar"

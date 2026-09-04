@@ -3,7 +3,7 @@
 #
 #     bash scripts/setup-android-signing.sh
 #
-# Run once, and again after anything regenerates app/src-tauri/gen —
+# Run once, and again after anything regenerates app/src-tauri/gen,
 # that whole directory is ignored by git, so this patch has to be
 # reapplicable rather than committed. It is idempotent.
 #
@@ -32,7 +32,7 @@ p = pathlib.Path(sys.argv[1]); t = p.read_text()
 
 # Loaded next to Tauri's own properties, from outside the generated tree.
 loader = '''
-// CHESY-SIGNING — applied by scripts/setup-android-signing.sh
+// CHESY-SIGNING, applied by scripts/setup-android-signing.sh
 // Kept outside gen/ so it survives regeneration, and gitignored so a
 // signing key is never committed.
 val keystoreProperties = Properties().apply {
@@ -117,7 +117,7 @@ else
 
 No app/src-tauri/keystore.properties yet, so release builds stay unsigned.
 
-To sign them, create a keystore and a properties file yourself — this
+To sign them, create a keystore and a properties file yourself. This
 script will not do it, because both steps involve passwords:
 
   1. Generate the key. Choose a strong password when prompted, and keep

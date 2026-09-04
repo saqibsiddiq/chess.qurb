@@ -1,32 +1,3 @@
-//! On-device move-explanation generation via a small fine-tuned language
-//! model (SmolLM2-135M + LoRA, merged and quantized to GGUF — see
-//! `models/README.md`), run through llama.cpp's C API directly (no
-//! subprocess) so the same code path works on desktop and, eventually,
-//! mobile — subprocess spawning is not reliably available on Android,
-//! which is exactly why Stockfish needs a separate mobile story too.
-//!
-//! The model is loaded once at startup on a single dedicated worker
-//! thread, which owns one long-lived `LlamaContext` for the app's whole
-//! lifetime instead of creating a fresh one per call. That matters: a
-//! fresh `LlamaContext` isn't just a cheap KV-cache allocation — creating
-//! one does real compute-graph reservation work every time (visible as
-//! `sched_reserve`/`graph_reserve` logging on every call) — and repeating
-//! that on every move navigation was the main source of UI jitter found
-//! when this first shipped as "recreate a context per call." Reusing one
-//! context (reset between generations via `clear_kv_cache()`) removes
-//! that repeated setup cost entirely.
-//!
-//! Generation is strictly on-demand: the frontend calls `explain_move`
-//! only when the user explicitly asks to "explain this move in depth,"
-//! never automatically during review and never eagerly for the whole
-//! game. An earlier version fired requests for every move in the
-//! background as it was classified, which caused real "app not
-//! responding" freezes — the SLM's worker threads competing with
-//! Stockfish's own search threads for CPU during the live review (see
-//! project memory, 2026-09-01). The always-instant rule-based
-//! explanation (`app/src/lib/explanations.ts`) is the default shown for
-//! every move; the SLM is an opt-in deep-dive layered on top.
-
 use std::num::NonZeroU32;
 use std::path::Path;
 use std::sync::mpsc;
@@ -46,15 +17,8 @@ use crate::correction::correct_explanation;
 const SYSTEM_PROMPT: &str = "You are a chess coach explaining one move to a human player. Use only the supplied facts. Do not invent tactical claims or variations. Explain the key chess idea, why the move was good or bad, and what the best move improves when one is supplied. Be concise and instructional.";
 const MAX_NEW_TOKENS: usize = 80;
 const N_CTX: u32 = 1024;
-// A tiny 135M model gets little benefit from many threads, and the
-// worker runs concurrently with Stockfish's own 4 search threads during
-// a review — kept deliberately low so background generation doesn't
-// starve everything else on the machine, midrange phones included.
 const N_THREADS: i32 = 2;
 
-/// Every fact the model (and the deterministic correction pass) needs for
-/// one move, mirroring the structured `input` rows the model was trained
-/// on (see `ml/data/preparation/build_sft_dataset.py`).
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MoveFacts {
@@ -77,17 +41,11 @@ fn opt_i32(v: Option<i32>) -> String {
     v.map_or_else(|| "None".to_string(), |n| n.to_string())
 }
 
-/// Renders a JSON value the way Python's `json.dumps` (default separators)
-/// would — serde_json's compact output omits the spaces after `:`/`,`
-/// that the training prompts always have. Safe here because motif_detail
-/// only ever holds chess square/piece vocabulary, never characters that
-/// would collide with this substitution.
 fn python_style_json(value: &serde_json::Value) -> String {
     let compact = serde_json::to_string(value).unwrap_or_else(|_| "{}".to_string());
     compact.replace(':', ": ").replace(',', ", ")
 }
 
-/// Builds the exact user-turn text the model was trained on.
 fn build_user_prompt(facts: &MoveFacts) -> String {
     let motif_detail = facts
         .motif_detail
@@ -113,10 +71,6 @@ fn build_user_prompt(facts: &MoveFacts) -> String {
     )
 }
 
-/// ChatML formatting, matching the tokenizer's own `chat_template.jinja`
-/// exactly (built by hand rather than via llama.cpp's template-name
-/// heuristics, to guarantee byte-for-byte the same prompt shape used
-/// during training and evaluation).
 fn build_prompt(facts: &MoveFacts) -> String {
     format!(
         "<|im_start|>system\n{SYSTEM_PROMPT}<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
@@ -146,19 +100,8 @@ pub struct WorkItem {
     reply: mpsc::Sender<Result<SlmExplanation, String>>,
 }
 
-/// Explanations are on-demand only (the user explicitly asks to "explain
-/// this move in depth") — never fired automatically during review or in
-/// the background, since that's exactly what caused real UI freezes when
-/// this was tried (see project memory, 2026-09-01): the SLM competing
-/// with Stockfish's own search threads for CPU during the live review.
-/// With generation strictly opt-in, one at a time, a plain FIFO is all
-/// this needs — no priority queue, since there's never background
-/// traffic for a request to need to jump ahead of.
 pub type SlmHandle = mpsc::Sender<WorkItem>;
 
-/// Spawns the single background worker thread that owns the model and
-/// its one long-lived context for the app's lifetime, and returns the
-/// handle used to submit requests to it.
 fn spawn_worker(backend: LlamaBackend, model: LlamaModel) -> Result<SlmHandle, String> {
     let ctx_params = LlamaContextParams::default()
         .with_n_ctx(NonZeroU32::new(N_CTX))
@@ -218,10 +161,6 @@ pub fn explain_move(
     rx.recv().map_err(|_| "SLM worker thread is gone".to_string())?
 }
 
-/// The actual generation + correction pipeline, kept free of any Tauri
-/// types so it can be exercised directly in tests without a running app.
-/// Reuses the caller's context across calls — resets its KV cache first,
-/// since each call is an independent, unrelated prompt.
 fn generate(model: &LlamaModel, ctx: &mut LlamaContext, facts: &MoveFacts) -> Result<String, String> {
     ctx.clear_kv_cache();
 
@@ -279,12 +218,6 @@ fn generate(model: &LlamaModel, ctx: &mut LlamaContext, facts: &MoveFacts) -> Re
 mod tests {
     use super::*;
 
-    /// End-to-end check against the actual bundled GGUF model: a
-    /// mate-involving position where the base model is known (from the
-    /// Python evaluation) to invent a wrong pawn figure instead of using
-    /// "forced mate" phrasing — confirms both that the native binding
-    /// produces the same generation as llama-cli/transformers, and that
-    /// the correction layer catches this specific failure mode for real.
     #[test]
     fn mate_case_gets_corrected() {
         let model_path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -332,11 +265,6 @@ mod tests {
             "correction should have replaced the invented pawns figure, got: {explanation}"
         );
 
-        // Reused context, second unrelated position: proves
-        // clear_kv_cache() actually resets generation state between
-        // calls rather than leaking tokens from the previous prompt —
-        // the exact risk introduced by moving from a fresh context per
-        // call to one long-lived context reused across many calls.
         let second_facts = MoveFacts {
             fen: "8/5p2/1p4p1/p4k2/P1B3n1/1P3K2/8/8 b - - 4 44".to_string(),
             color: "black".to_string(),

@@ -35,8 +35,6 @@ describe('applyAttempt', () => {
   });
 
   test('auto-queens a promotion', () => {
-    // Chessground reports only the two squares, so a promotion that
-    // wasn't given a piece must still produce a legal move.
     const promo = '8/P6k/8/8/8/8/8/7K w - - 0 1';
     expect(applyAttempt(promo, 'a7', 'a8')).toMatchObject({ uci: 'a7a8q', san: 'a8=Q' });
   });
@@ -68,7 +66,6 @@ describe('judgeAttempt', () => {
     [60, 'inaccurate'],
     [400, 'poor'],
   ])('a %icp drop for White scores %s', async (loss, verdict) => {
-    // White to move: eval is White-relative, so a drop is before - after.
     invokeMock.mockResolvedValue(analysis({ evalCp: 100 - loss }));
     const result = await judgeAttempt(start, 'd2', 'd4', analysis({ bestMove: 'e2e4', evalCp: 100 }), 12);
     expect(result?.verdict).toBe(verdict);
@@ -76,11 +73,8 @@ describe('judgeAttempt', () => {
   });
 
   test('scores a drop correctly when Black is to move', async () => {
-    // The sign flip for Black is the classic place this goes wrong: a
-    // move that helps White is a *loss* for Black, so the delta has to be
-    // read the other way round.
     const blackToMove = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
-    invokeMock.mockResolvedValue(analysis({ evalCp: 300 })); // better for White
+    invokeMock.mockResolvedValue(analysis({ evalCp: 300 }));
     const result = await judgeAttempt(
       blackToMove,
       'a7',
@@ -100,8 +94,6 @@ describe('judgeAttempt', () => {
   });
 
   test('explains a hanging piece rather than only scoring it', async () => {
-    // Bishop to g7 puts it en prise to the rook on g8. A verdict and a
-    // number alone don't tell the player what they did wrong.
     const beforeFen = '4k1r1/8/8/8/8/2B5/8/4K3 w - - 0 1';
     invokeMock.mockResolvedValue(analysis({ evalCp: -300 }));
     const result = await judgeAttempt(beforeFen, 'c3', 'g7', analysis({ bestMove: 'c3d4', evalCp: 0 }), 12);
@@ -110,14 +102,12 @@ describe('judgeAttempt', () => {
 
   test('calls out walking into a forced mate', async () => {
     const beforeFen = '2r3k1/pp3pp1/4p2p/4Pn2/8/P4N2/1P1r1PPP/3R2K1 w - - 0 23';
-    // Negative mate score with White to move means White gets mated.
     invokeMock.mockResolvedValue(analysis({ evalCp: null, evalMate: -3 }));
     const result = await judgeAttempt(beforeFen, 'd1', 'd2', analysis({ bestMove: 'f3d2', evalCp: -180 }), 12);
     expect(result?.reason).toBe('That allows a forced mate in 3.');
   });
 
   test('says nothing extra when the attempt was fine', async () => {
-    // A reason on a good move would be noise — there is nothing to warn about.
     const start = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
     invokeMock.mockResolvedValue(analysis({ evalCp: 95 }));
     const result = await judgeAttempt(start, 'd2', 'd4', analysis({ bestMove: 'e2e4', evalCp: 100 }), 12);

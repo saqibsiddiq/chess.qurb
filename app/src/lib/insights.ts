@@ -1,17 +1,6 @@
 import type { ReviewSummary } from './storage';
 import { outcomeFor, type Termination } from './termination';
 
-// Cross-game aggregation. A single review says "you blundered on move 23";
-// twenty reviews say "you hang pieces, and it happens about once a game" —
-// only the second changes what someone practises.
-//
-// This reads the summary index alone. The per-colour classification and
-// motif tallies were put there for exactly this reason, so a weakness
-// report never has to load (or re-classify) every stored game.
-
-/// Motifs that represent something going wrong. `mate` is excluded on
-/// purpose — it marks a checkmate the player *delivered*, so counting it
-/// as a weakness would be backwards.
 const WEAKNESS_LABELS: Record<string, string> = {
   hanging_piece: 'Leaving pieces hanging',
   fork: 'Missing forks',
@@ -30,33 +19,21 @@ export interface Weakness {
   motif: string;
   label: string;
   count: number;
-  /// Occurrences per game — the figure that makes two players (or two
-  /// time periods) comparable when they haven't played the same amount.
   perGame: number;
 }
 
 export interface PlayerInsights {
   player: string;
   games: number;
-  /// How many of the stored games this name actually appeared in, so the
-  /// UI can be honest about how thin the sample is.
   wins: number;
   draws: number;
   losses: number;
   averageAccuracy: number;
-  /** How the player's losses ended, keyed by termination. Losing on time
-   *  is a different problem from being outplayed, and nothing in a
-   *  move-quality score can tell them apart. */
   lossesBy: Partial<Record<Termination, number>>;
-  /// Costly-move counts per game, keyed by classification.
   perGame: Record<CostlyClass, number>;
   weaknesses: Weakness[];
 }
 
-/// Identifies whose games these are by finding the name that recurs most
-/// across the library. Someone reviewing their own games appears in every
-/// one of them, so this needs no setup — and returning the name lets the
-/// UI say which player it picked rather than silently guessing.
 export function detectPlayer(summaries: ReviewSummary[]): string | null {
   const counts = new Map<string, number>();
   for (const s of summaries) {
@@ -75,7 +52,6 @@ export function detectPlayer(summaries: ReviewSummary[]): string | null {
   }
   return best;
 }
-
 
 export function aggregate(summaries: ReviewSummary[], player: string): PlayerInsights | null {
   const mine = summaries.filter((s) => s.white === player || s.black === player);
@@ -152,8 +128,6 @@ export function aggregate(summaries: ReviewSummary[], player: string): PlayerIns
   };
 }
 
-/// Convenience for the common case: work out who the player is, then
-/// aggregate their games.
 export function insightsFor(summaries: ReviewSummary[]): PlayerInsights | null {
   const player = detectPlayer(summaries);
   return player ? aggregate(summaries, player) : null;

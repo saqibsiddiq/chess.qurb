@@ -94,7 +94,7 @@ describe('detectNewlyHangingPiece', () => {
     const after = new Chess(afterFen);
     const result = detectNewlyHangingPiece(before, after, 'c3g7', 'w');
     expect(result?.square).toBe('g7');
-    expect(result?.value).toBe(3); // bishop
+    expect(result?.value).toBe(3);
   });
 
   test('does not flag a piece moved to a fully safe square', () => {
@@ -123,11 +123,6 @@ describe('explainMove arrow coherence', () => {
 
     const explanation = explainMove(move, beforeFen, analysis, 400, 'blunder', null, missedTactic);
 
-    // The fork's arrows fan out from c6 — the square the knight would
-    // land on. In the position actually on screen that square is empty,
-    // so on its own the fan appears to come from nowhere. The best move
-    // has to be drawn too, or the tactic is not explicable: green gets a
-    // piece to c6, yellow shows what it hits from there.
     const best = explanation.shapes.find((s) => s.brush === 'green');
     expect(best).toEqual({ orig: 'b4', dest: 'c6', brush: 'green' });
 
@@ -135,7 +130,6 @@ describe('explainMove arrow coherence', () => {
     expect(targets).toHaveLength(2);
     expect(targets.every((s) => s.orig === 'c6')).toBe(true);
 
-    // Still restrained: one move plus its two targets, nothing else.
     expect(explanation.shapes).toHaveLength(3);
   });
 
@@ -152,8 +146,6 @@ describe('explainMove arrow coherence', () => {
 
     const explanation = explainMove(move, beforeFen, analysis, 120, 'inaccuracy', null, null);
 
-    // Blue is what you did, green is what was better — two arrows answer
-    // a question one cannot.
     expect(explanation.shapes).toContainEqual({ orig: 'a2', dest: 'a3', brush: 'blue' });
     expect(explanation.shapes).toContainEqual({ orig: 'e2', dest: 'e4', brush: 'green' });
   });
@@ -229,16 +221,11 @@ describe('explainMove narration for the new classes', () => {
 
 describe('describeThreat', () => {
   test('names a piece the side to move can simply take', () => {
-    // Black to move; White's bishop on g7 is attacked by the rook on g8
-    // and defended by nothing.
     const threat = describeThreat('4k1r1/6B1/8/8/8/8/8/4K3 b - - 0 1');
     expect(threat).toBe('Your bishop on g7 is undefended and can be taken.');
   });
 
   test('describes the threat against whoever is *not* to move', () => {
-    // Same position with White to move: the loose bishop is White's own,
-    // so there is nothing to warn White about and the result is null —
-    // the threat always belongs to the side *not* on move.
     expect(describeThreat('4k1r1/6B1/8/8/8/8/8/4K3 w - - 0 1')).toBeNull();
   });
 

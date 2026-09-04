@@ -34,22 +34,12 @@ interface PgnFile {
 }
 
 interface HomeFlowProps {
-  /** `analysis`, when the source already has one, lets the review skip
-   *  the local engine entirely. */
   onImport: (pgn: string, analysis?: LichessAnalysisEntry[]) => void;
   recent: ReviewSummary[];
   onOpenRecent: (id: string) => void;
-  /** Lifts the current step up to the shell so there is one top bar for
-   *  the whole app rather than a second one nested inside this panel.
-   *  `onBack` is null on the first screen, which is what tells the shell
-   *  to show the logo instead of a back button. */
   onNav?: (nav: {
     title: string;
     onBack: (() => void) | null;
-    /** When set, the title names something you can act on — the connected
-     *  account — and the shell renders it as a control rather than a
-     *  label. Keeping it out of the page body is what leaves the whole
-     *  screen for the games. */
     onTitleTap?: (() => void) | null;
   }) => void;
 }
@@ -61,8 +51,6 @@ const PROVIDER_LABEL: Record<RemoteProvider, string> = {
   chesscom: 'Chess.com',
 };
 
-/** Routes with no title of their own: the first screen, and the provider
- *  screen whose title is the connected account's name. */
 const UNTITLED: ReadonlySet<Route> = new Set(['root', 'provider']);
 
 function formatSize(bytes: number): string {
@@ -81,19 +69,12 @@ function formatWhen(epochSeconds: number): string {
   return `${Math.floor(days / 365)} years ago`;
 }
 
-/// Below this, a "pattern" is just noise — one or two games say nothing
-/// about how somebody habitually plays, and presenting it as a trend
-/// would be a lie dressed up as data.
 const MIN_GAMES_FOR_INSIGHTS = 3;
 
 export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: HomeFlowProps) {
   const tr = useT();
-  // Derived from the summary index alone, so this costs a pass over a
-  // handful of small objects rather than loading any stored game.
   const insights = useMemo(() => insightsFor(recent), [recent]);
 
-  // Grouped from the same summary index the patterns use, so this costs
-  // nothing extra.
   const openings = useMemo(
     () => (insights ? openingRecords(recent, insights.player).slice(0, 6) : []),
     [recent, insights],
@@ -106,10 +87,6 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
   const [games, setGames] = useState<RemoteGameSummary[]>([]);
   const [loadingGames, setLoadingGames] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** Username we are connected as for the current provider, or null.
-   *  Kept in state rather than read from storage at render time so the
-   *  connected view appears the moment a first sign-in succeeds, not on
-   *  the next visit. */
   const [connected, setConnected] = useState<string | null>(null);
 
   const [files, setFiles] = useState<PgnFile[] | null>(null);
@@ -133,9 +110,6 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
     go('root');
   };
 
-  /* ── Local files ────────────────────────────────────────────────
-     Scanned once per visit to Browse: the answer changes rarely and a
-     re-walk on every keystroke elsewhere would be wasted work. */
   const scan = useCallback(async () => {
     setScanning(true);
     setScanError(null);
@@ -143,8 +117,6 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
       const found = await invoke<PgnFile[]>('scan_pgn_files');
       setFiles(found);
     } catch (err) {
-      // Outside the desktop shell there is no filesystem to scan; the
-      // file picker below still works, so this is a note, not a failure.
       setScanError(String(err));
       setFiles([]);
     } finally {
@@ -186,8 +158,6 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
       try {
         const found = await fetchRemoteGames(forProvider, name);
         setGames(found);
-        // Only remembered once it actually worked — storing a typo would
-        // make every future visit start with a failing request.
         saveAccount({ provider: forProvider, username: name });
         setConnected(name);
       } catch (err) {
@@ -199,20 +169,8 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
     [],
   );
 
-  /** Provider whose games this visit has already asked for. Without it a
-   *  failed request would re-fire the effect the moment `loadingGames`
-   *  went false — games would still be empty, so the condition would hold
-   *  again — and the account would sit in a silent retry loop. */
   const autoFetched = useRef<RemoteProvider | null>(null);
 
-  // A remembered account skips straight to a refreshed list: the account
-  // doesn't change between visits, only the games do.
-  //
-  // Deliberately not gated on `username` being empty. `openProvider`
-  // fills the username in from storage before switching route, so a
-  // `!username` guard here is false on the very first render and the
-  // fetch never runs at all — which is what made a connected account show
-  // an empty list under a search box.
   useEffect(() => {
     if (route !== 'provider' || !provider) return;
     if (games.length > 0 || loadingGames) return;
@@ -227,8 +185,6 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
   const openProvider = (next: RemoteProvider) => {
     const saved = loadAccount();
     setProvider(next);
-    // Clear any list from the other provider so the remembered account
-    // for *this* one can load in its place.
     setGames([]);
     const known = saved?.provider === next ? saved.username : '';
     setUsername(known);
@@ -247,8 +203,6 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
   };
 
   const isRoot = route === 'root';
-  // On a connected provider the screen is about the account, not the
-  // site, so the account's name is the title.
   const stepTitle =
     route === 'provider' && provider
       ? connected ?? PROVIDER_LABEL[provider]
@@ -263,16 +217,12 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
       onBack: isRoot ? null : back,
       onTitleTap: titleActs ? switchAccount : null,
     });
-    // `back` is redefined every render; depending on it would report on
-    // every render instead of every step.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, stepTitle, isRoot, titleActs, onNav]);
 
   return (
     <div className="home">
       <div className={`home-panel${isRoot ? ' is-root' : ''}`}>
-        {/* `key` restarts the enter animation on every step, which is what
-            makes the flow read as navigation rather than a redraw. */}
+        {}
         <div className="home-step" key={route}>
 
           {route === 'root' && (
@@ -349,10 +299,7 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
 
           {route === 'provider' && provider && (
             <>
-              {/* The account is named in the top bar, and switching is a
-                  tap on that name — so this screen is nothing but games.
-                  A remembered account never sees a search box: asking for
-                  the username again reads as "we lost you". */}
+              {}
               {connected ? null : (
                 <form
                   className="field-row"
@@ -386,9 +333,7 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
                   {games.map((g, i) => (
                     <li key={g.id}>
                       <button type="button" className="row" onClick={() => onImport(g.pgn, g.analysis)}>
-                        {/* Newest first, so the number is a position in the
-                            list rather than a game id — it is there to keep
-                            your place while scrolling a hundred rows. */}
+                        {}
                         <span className="row-no num">{i + 1}</span>
                         <span className="row-main">
                           <span className="row-title">
@@ -436,10 +381,7 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
 
           {route === 'browse' && (
             <>
-              {/* A line, not skeleton rows. The placeholders were built
-                  before rows became glass buttons; once they inherited
-                  that chrome they read as three broken, empty controls
-                  rather than as "loading". */}
+              {}
               {scanning && <p className="empty-note">{tr('local.scanning')}</p>}
 
               {!scanning && files && files.length > 0 && (
@@ -523,8 +465,7 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
 
           {route === 'stats' && insights && (
             <>
-              {/* Written for someone who has never seen an engine report:
-                  every number says what it means in the same breath. */}
+              {}
               <div className="stat-grid">
                 <div className={`stat-card is-${accuracyTone(insights.averageAccuracy)}`}>
                   <span className="stat-value num">{insights.averageAccuracy.toFixed(0)}%</span>

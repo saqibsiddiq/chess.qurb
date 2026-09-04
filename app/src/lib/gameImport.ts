@@ -3,9 +3,6 @@ import type { LichessAnalysisEntry } from './lichessAnalysis';
 export type RemoteProvider = 'lichess' | 'chesscom';
 
 export interface RemoteGameSummary {
-  /** Lichess's own per-ply analysis, when the game has been analysed
-   *  there. Its presence lets a review render with no local engine work
-   *  at all — see lichessAnalysis.ts. */
   analysis?: LichessAnalysisEntry[];
   id: string;
   white: string;
@@ -20,28 +17,16 @@ export interface RemoteGameSummary {
 
 class GameImportError extends Error {}
 
-/// How many games a Connect fetch pulls. Chess.com serves whole months at
-/// a time, so a larger number usually costs no extra requests; Lichess
-/// streams, so it is one response either way.
 export const DEFAULT_MAX_GAMES = 100;
 
-// No fetch here had a timeout, so a stalled request on a flaky mobile
-// connection left the Connect panel spinning forever with no way out.
-// (The same class of bug once cost this project a 3.5-hour overnight run
-// against an SDK whose client had no default timeout.) Every request
-// below goes through this wrapper.
 const REQUEST_TIMEOUT_MS = 12_000;
 
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
-  // AbortSignal.any combines our timeout with any caller-supplied signal
-  // (a cancel button), so whichever fires first aborts the request.
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   return fetch(url, { ...init, signal });
 }
 
-/// Distinguishes "we gave up waiting" from "the network is unreachable",
-/// so the user gets an error that suggests the right next action.
 function networkError(err: unknown, service: string): GameImportError {
   const timedOut = err instanceof DOMException && err.name === 'TimeoutError';
   return new GameImportError(
@@ -163,23 +148,11 @@ export async function fetchChessComGames(username: string, max = DEFAULT_MAX_GAM
   if (!archives?.length) throw new GameImportError(`"${trimmed}" has no games on Chess.com yet.`);
 
   const games: RemoteGameSummary[] = [];
-  // Archives are chronological (oldest first) — walk backwards from the
-  // most recent month so users see their latest games, not their oldest.
-  //
-  // The first month is fetched on its own, and only if that didn't yield
-  // enough games do later months get fetched several at a time. Going
-  // straight to parallel batches would speed up a sparse account (which
-  // otherwise pays one full round trip per thin month) at the cost of
-  // making an active player — whose latest month alone covers `max` —
-  // download two months of history they'll never see. Widening only
-  // after a miss gets the latency win without that waste.
   let batchSize = 1;
   for (let i = archives.length - 1; i >= 0 && games.length < max; i -= batchSize, batchSize = 3) {
     const batch: string[] = [];
     for (let k = i; k > i - batchSize && k >= 0; k--) batch.push(archives[k]);
 
-    // A failed month is skipped, not fatal — one bad archive shouldn't
-    // lose the games we did manage to fetch alongside it.
     const responses = await Promise.all(
       batch.map(async (url) => {
         try {
@@ -192,8 +165,6 @@ export async function fetchChessComGames(username: string, max = DEFAULT_MAX_GAM
       }),
     );
 
-    // Iterated in batch order (newest month first) so the newest-first
-    // ordering the loop above establishes survives the parallel fetch.
     for (const payload of responses) {
       if (!payload?.games) continue;
       for (let j = payload.games.length - 1; j >= 0 && games.length < max; j--) {

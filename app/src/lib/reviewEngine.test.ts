@@ -196,8 +196,6 @@ describe('reviewGame classification precedence', () => {
 });
 
 describe('reviewGame severity ladder (no book/tactics involved)', () => {
-  // Shared setup: a quiet position with no opening-book entry and no
-  // tactical motif, varying only the eval swing to walk the ladder.
   const startingFen = '4k3/8/8/8/8/8/8/2Q1K3 w - - 0 1';
   const move = {
     moveNumber: 1,
@@ -225,9 +223,6 @@ describe('reviewGame severity ladder (no book/tactics involved)', () => {
 
 describe('reviewMove incremental classification matches a full reviewGame batch call', () => {
   test('classifying one move at a time, in order, produces the same result as reviewGame', () => {
-    // A short quiet sequence with a mix of severities — walking a king
-    // back and forth on an empty board, so no book/tactic motifs get in
-    // the way of checking pure incremental-vs-batch equivalence.
     const startingFen = '4k3/8/8/8/8/8/8/2Q1K3 w - - 0 1';
     const game: ParsedGame = {
       headers: {},

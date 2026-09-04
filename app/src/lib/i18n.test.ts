@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LanguageUnavailableError, setLanguage, t, currentLanguage } from './i18n';
 
-/** In-memory storage; the suite runs on node with no DOM. */
 function stubStorage(): Map<string, string> {
   const store = new Map<string, string>();
   vi.stubGlobal('localStorage', {
@@ -30,13 +29,10 @@ describe('translation lookup', () => {
   });
 
   it('leaves a placeholder alone when no value is supplied', () => {
-    // Better a visible `{percent}` than a silently empty sentence.
     expect(t('review.reviewing')).toContain('{percent}');
   });
 
   it('returns the key itself when nothing has that key', () => {
-    // A missing translation should be obvious in the interface rather
-    // than rendering as blank space.
     expect(t('nope.not.a.key')).toBe('nope.not.a.key');
   });
 });
@@ -61,8 +57,6 @@ describe('switching language', () => {
     expect(t('settings.appearance')).toBe('Apariencia');
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    // Round-trip through English and back: the second switch must be
-    // served from cache, which is what makes a language work offline.
     await setLanguage('en');
     await setLanguage('es');
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -75,17 +69,13 @@ describe('switching language', () => {
       json: async () => ({ 'settings.appearance': 'Apariencia' }),
     }));
     await setLanguage('es');
-    // Translated where the pack has it...
     expect(t('settings.appearance')).toBe('Apariencia');
-    // ...and still readable where it does not, rather than showing a key.
     expect(t('settings.board')).toBe('Board');
   });
 
   it('keeps the working language when a download fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     await expect(setLanguage('fr')).rejects.toBeInstanceOf(LanguageUnavailableError);
-    // A half-applied switch would be worse than none: the app must still
-    // be entirely in the language it was.
     expect(currentLanguage()).toBe('en');
     expect(t('settings.appearance')).toBe('Appearance');
   });

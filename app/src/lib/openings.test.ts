@@ -4,7 +4,6 @@ import { parsePgn } from './parsePgn';
 
 describe('nameFromEcoUrl', () => {
   test('keeps the name and drops the move list', () => {
-    // Real Chess.com slug shape, verified against their live API.
     expect(
       nameFromEcoUrl(
         'https://www.chess.com/openings/Indian-Game-Spielmann-Indian-Variation...4.Nxd4-d5-5.Bg2-e5',
@@ -44,8 +43,6 @@ describe('openingFrom', () => {
   });
 
   test('keeps the ECO code even when no name can be found', () => {
-    // The code still identifies the opening; dropping it would lose
-    // information we actually have.
     expect(openingFrom({ ECO: 'C20' })).toEqual({ eco: 'C20', name: null });
   });
 
@@ -56,16 +53,12 @@ describe('openingFrom', () => {
 
 describe('bookExitPly', () => {
   test('reports the first move outside the mined book', () => {
-    // 1. e4 is overwhelmingly common, so book must extend at least a ply.
     const game = parsePgn('1. e4 e5 2. Nf3 Nc6 *');
     const exit = bookExitPly(game);
     expect(exit === null || exit > 0).toBe(true);
   });
 
   test('an immediately offbeat move leaves book at once', () => {
-    // The mined book covers 19 of the 20 legal first moves — even 1. a4
-    // appears often enough to qualify. 1. Na3 is the one that does not,
-    // which makes it the only reliable "off book from move one" case.
     const game = parsePgn('1. Na3 e5 *');
     expect(bookExitPly(game)).toBe(0);
   });
@@ -85,25 +78,21 @@ describe('openingRecords', () => {
 
   test('scores results from the player’s own side', () => {
     const [sicilian] = openingRecords(games, 'me');
-    // Won as White, won as Black, drew.
     expect(sicilian).toMatchObject({ name: 'Sicilian Defense', games: 3, wins: 2, draws: 1, losses: 0 });
     expect(sicilian.score).toBeCloseTo(2.5 / 3, 5);
   });
 
   test('averages accuracy from the colour the player had', () => {
     const [sicilian] = openingRecords(games, 'me');
-    // 80 as White, 90 as Black, 70 as White.
     expect(sicilian.accuracy).toBeCloseTo(80, 5);
   });
 
   test('averages book exit over only the games that recorded one', () => {
     const [sicilian] = openingRecords(games, 'me');
-    // 6 and 8; the null game must not drag the mean toward zero.
     expect(sicilian.averageBookExit).toBeCloseTo(7, 5);
   });
 
   test('drops games whose opening is unknown', () => {
-    // An "Unknown" bucket would read as a repertoire choice.
     const withUnknown = [...games, { opening: null, eco: null, bookExitPly: 3, result: '1-0', white: 'me', black: 'z', whiteAccuracy: 99, blackAccuracy: 1 }];
     const total = openingRecords(withUnknown, 'me').reduce((n, r) => n + r.games, 0);
     expect(total).toBe(4);

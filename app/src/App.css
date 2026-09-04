@@ -1,27 +1,8 @@
-/* ═══════════════════════════════════════════════════════════════
-   Chesy — application shell
-
-   Shares the marketing site's design language (Google Antigravity
-   tokens: light surface, Google Sans Flex, pill controls) but at
-   *application* scale rather than marketing scale — denser type,
-   tighter radii, hairline structure and fast motion. A landing page
-   earns its calm from huge type and empty space; a tool that is
-   looked at for an hour needs layered surfaces and real density or
-   it reads as unfinished.
-
-   Layout rule: the shell owns the viewport and never scrolls. Panes
-   manage their own overflow, so the board, the controls and the
-   current explanation are always on screen at every size.
-   ═══════════════════════════════════════════════════════════════ */
-
 @import url('https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600&family=Google+Sans+Flex:opsz,slnt,wdth,wght@8..144,-10..0,25..150,400..500&display=swap');
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 :root{
-  /* ── Surface ramp ────────────────────────────────────────
-     The canvas is tinted and panels are white on top of it.
-     Flat white on white is what made this read as empty.   */
   --canvas:            #eff2f8;
   --canvas-deep:       #e9ecf2;
   --panel:             #fff;
@@ -43,10 +24,6 @@
   --line-soft:         rgba(18,19,23,.055);
   --line-inverse:      rgba(230,234,240,.11);
 
-  /* ── Interaction ───────────────────────────────────────
-     One accent hue, shared with the marketing site's --c-great, carries
-     every active and primary state. Structure stays neutral; colour is
-     reserved for the things that respond to you. */
   --accent:            #2563d9;
   --accent-hover:      #1d51b8;
   --accent-soft:       rgba(50,121,249,.10);
@@ -58,9 +35,6 @@
   --tint:              rgba(18,19,23,.045);
   --tint-strong:       rgba(18,19,23,.075);
 
-  /* ── Move classification ───────────────────────────────
-     Taken verbatim from website/style.css so the app and the
-     marketing site describe the same move with the same colour. */
   --c-brilliant:  #21bfa4;
   --c-great:      #3279f9;
   --c-best:       #7cb342;
@@ -72,34 +46,19 @@
   --c-miss:       #e0645a;
   --c-blunder:    #d3443a;
 
-  /* ── Glass ──────────────────────────────────────────────
-     Used only where text sits over the moving piece field: the top bar,
-     the explanation, and overlays. Blur is charged per painted frame
-     against whatever is behind it, so three surfaces is a deliberate
-     ceiling rather than a style applied everywhere. */
   --glass-fill:      color-mix(in srgb, var(--panel) 58%, transparent);
   --glass-blur:      blur(24px) saturate(180%);
   --glass-edge:      rgba(255,255,255,.55);
   --glass-specular:  rgba(255,255,255,.75);
   --glass-shadow:    0 8px 32px rgba(18,19,23,.14);
 
-  /* Text colour for a tinted statistic card. The classification accents
-     are tuned to sit on the plain panel, and measured 2.18:1 (green) and
-     1.90:1 (amber) once the card behind them is tinted with the same hue
-     — nowhere near the 4.5:1 that 22px/500 text needs. These are the
-     same hues darkened until they pass against that tinted ground. */
   --tone-good-ink: #41661a;
   --tone-ok-ink:   #85560c;
   --tone-weak-ink: #b73026;
 
-  /* ── Board ───────────────────────────────────────────── */
   --board-light: #eef1f6;
   --board-dark:  #aebbcc;
 
-  /* ── Type ────────────────────────────────────────────────
-     Application scale: 13px UI text, weight 500 for anything
-     that carries hierarchy. Google Sans Flex tops out at 500,
-     so contrast comes from colour and surface, not weight.  */
   --font: 'Google Sans Flex','Google Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
   --mono: 'Google Sans Code',ui-monospace,SFMono-Regular,Menlo,monospace;
 
@@ -111,27 +70,19 @@
   --fs-sm:    12.5px; --lh-sm:      17px; --ls-sm:      .05px;
   --fs-xs:      11px; --lh-xs:      15px; --ls-xs:      .07em;
 
-  /* ── Shape ───────────────────────────────────────────── */
   --board-gutter:14px;
   --r-xs:4px; --r-sm:7px; --r-md:11px; --r-lg:15px; --r-xl:20px; --r-pill:9999px;
 
-  /* ── Elevation ───────────────────────────────────────────
-     A hairline ring plus a short shadow. Both, always — the
-     ring is what keeps a panel legible on a tinted canvas.  */
   --e-1: 0 0 0 1px var(--line-soft), 0 1px 2px rgba(18,19,23,.04);
   --e-2: 0 0 0 1px var(--line-soft), 0 2px 4px rgba(18,19,23,.04), 0 8px 20px rgba(18,19,23,.05);
   --e-3: 0 0 0 1px var(--line-soft), 0 4px 10px rgba(18,19,23,.06), 0 18px 44px rgba(18,19,23,.08);
 
-  /* ── Space ───────────────────────────────────────────── */
   --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px;
   --s-6:24px; --s-8:32px; --s-10:40px; --s-12:56px;
 
   --topbar-h:56px;
   --gutter:16px;
 
-  /* ── Motion ──────────────────────────────────────────────
-     Short and quad-eased for anything the pointer triggers;
-     the long quint curve is reserved for entrances.        */
   --ease: cubic-bezier(.25,.46,.45,.94);
   --ease-enter: cubic-bezier(.23,1,.32,1);
   --t-fast: 120ms;
@@ -164,14 +115,10 @@ ul{list-style:none}
 ::selection{background:var(--ink);color:var(--panel)}
 :focus-visible{outline:2px solid var(--c-great);outline-offset:2px;border-radius:var(--r-xs)}
 
-/* Scrollbars, so an internal scroll never looks like a system widget
-   bolted onto a designed surface. */
 *::-webkit-scrollbar{width:10px;height:10px}
 *::-webkit-scrollbar-track{background:transparent}
 *::-webkit-scrollbar-thumb{background:rgba(18,19,23,.14);border:3px solid transparent;background-clip:content-box;border-radius:var(--r-pill)}
 *::-webkit-scrollbar-thumb:hover{background:rgba(18,19,23,.24);background-clip:content-box}
-
-/* ── Type utilities ─────────────────────────────────────── */
 
 .t-display{font-size:var(--fs-display);line-height:var(--lh-display);letter-spacing:var(--ls-display);font-weight:500}
 .t-title{font-size:var(--fs-title);line-height:var(--lh-title);letter-spacing:var(--ls-title);font-weight:500}
@@ -189,36 +136,19 @@ ul{list-style:none}
 
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:0}
 
-/* ── Shell ──────────────────────────────────────────────── */
-
 .app{
   height:100dvh;
   display:grid;
   grid-template-rows:auto minmax(0,1fr);
   overflow:hidden;
   background:var(--canvas);
-  /* Android 15 draws every app edge-to-edge once it targets SDK 35+, and
-     this one targets 36 — so without these the top bar renders underneath
-     the status bar and the back button sits behind the system clock.
-     Measured on a Galaxy S23. The piece field is viewport-fixed and
-     deliberately stays outside this padding, so the background still runs
-     under the system bars while the controls do not. */
   padding-top:env(safe-area-inset-top, 0px);
   padding-bottom:env(safe-area-inset-bottom, 0px);
   padding-left:env(safe-area-inset-left, 0px);
   padding-right:env(safe-area-inset-right, 0px);
 }
-/* Grid items default to min-width:auto, which lets one wide child (a long
-   PV line, a move row) push the view past the viewport. The shell clips
-   rather than scrolls, so that overflow would be silently lost. */
 .app > *{min-width:0}
 
-
-/* ── Dark theme ──────────────────────────────────────────────
-   Only tokens are redefined; every component reads through them,
-   so nothing below this block needs a dark-specific rule. The
-   classification accents are deliberately unchanged — they carry
-   meaning, and they already read well on both grounds. */
 [data-theme="dark"]{
   --canvas:            #0d1016;
   --canvas-deep:       #090b0e;
@@ -231,9 +161,6 @@ ul{list-style:none}
   --ink-faint:         #868d99;
   --ink-ghost:         #5d646f;
 
-  /* The insight card is an inverted surface in light mode. On a dark
-     ground it has to go the other way — lighter than the canvas — or it
-     disappears into it. */
   --inverse:           #21252d;
   --inverse-high:      #272c35;
   --on-inverse:        #e8ebf1;
@@ -244,21 +171,11 @@ ul{list-style:none}
   --line-soft:         rgba(232,235,241,.07);
   --line-inverse:      rgba(232,235,241,.12);
 
-  /* On a dark ground the accent has to do two jobs with different
-     contrast needs: as *text* it must be light enough to read on a panel,
-     as a *button fill* it must be dark enough for white text to sit on
-     it. One value can't do both — measured 4.47 and 3.90, both under AA —
-     so they're separate here. */
   --accent:            #7aa7ff;
   --accent-hover:      #9abcff;
   --accent-soft:       rgba(122,167,255,.14);
   --accent-line:       rgba(122,167,255,.34);
 
-  /* On the dark ground the green and amber accents already clear 4.5:1
-     against their tinted cards (measured 5.48 and 6.27), so they are used
-     unmodified; only the red needs lifting, at 3.33:1 as-is. */
-  /* On the dark ground the specular edge has to be much quieter, or the
-     rim reads as a hard white outline rather than a lit edge. */
   --glass-fill:      color-mix(in srgb, var(--panel) 62%, transparent);
   --glass-edge:      rgba(255,255,255,.10);
   --glass-specular:  rgba(255,255,255,.16);
@@ -289,7 +206,6 @@ ul{list-style:none}
 [data-theme="dark"] .graph-area-white{fill:rgba(50,121,249,.20)}
 [data-theme="dark"] .graph-area-black{fill:rgba(232,235,241,.08)}
 
-/* ── Theme toggle ────────────────────────────────────────── */
 .theme-toggle{
   display:grid;place-items:center;
   width:32px;height:32px;
@@ -300,16 +216,10 @@ ul{list-style:none}
 .theme-toggle:hover{background:var(--tint);color:var(--ink)}
 .theme-toggle svg{width:17px;height:17px;fill:currentColor}
 
-/* ── Top bar ────────────────────────────────────────────── */
-
 .topbar{
   display:flex;align-items:center;gap:var(--s-3);
   height:var(--topbar-h);
   padding-inline:var(--gutter);
-  /* Deliberately the same surface as the shell, with no hairline: the
-     header is part of the app, not a chrome bar sitting on top of it.
-     Transparent rather than `--canvas`, so the piece field drifting
-     behind the shell is not cut off by a solid band across the top. */
   background:transparent;
   position:relative;z-index:20;
 }
@@ -348,8 +258,6 @@ ul{list-style:none}
 .status-pill.is-ready .status-dot{background:var(--c-best);box-shadow:0 0 0 2.5px rgba(106,159,52,.18)}
 .status-pill.is-warning .status-dot{background:var(--c-inaccuracy);box-shadow:0 0 0 2.5px rgba(220,148,38,.18)}
 
-/* ── Buttons ────────────────────────────────────────────── */
-
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:7px;
   font-size:var(--fs-base);font-weight:500;
@@ -382,8 +290,6 @@ ul{list-style:none}
 .chip-btn:disabled{opacity:.4;cursor:not-allowed}
 .chip-btn svg{width:13px;height:13px;fill:currentColor}
 
-/* ═══════════════ Home ═══════════════ */
-
 .home{
   min-height:0;overflow-y:auto;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -392,32 +298,17 @@ ul{list-style:none}
 }
 
 .home-panel{
-  /* No card. Content sits on the app background with the piece field
-     drifting behind it; grouping is carried by spacing, hairlines and
-     type hierarchy rather than a box drawn around everything.
-
-     The element stays because the *layout* still needs it: it bounds the
-     screen and lets `.home-step` take the leftover height and scroll
-     inside itself, which is what keeps a long screen reachable on a
-     phone. Only the chrome is gone. */
   width:100%;
   display:flex;flex-direction:column;
   max-height:100%;min-height:0;
 }
-/* Only the first screen is a centred column. The steps after it — game
-   lists, statistics, an opening — are denser and read better across the
-   full width they are given. */
 .home-panel.is-root{max-width:min(560px, 100%)}
 .home:has(.home-panel:not(.is-root)){justify-content:flex-start}
-
-
 
 .home-step{
   display:flex;flex-direction:column;gap:var(--s-3);
   padding:var(--s-3) var(--s-5) var(--s-5);
   animation:step-in var(--t-enter) var(--ease-enter) both;
-  /* The pane manages its own overflow rather than the screen scrolling:
-     the card's header stays put and only its content moves. */
   flex:1 1 auto;min-height:0;
   overflow-y:auto;
   overscroll-behavior:contain;
@@ -435,15 +326,12 @@ ul{list-style:none}
 }
 .home-sub{margin-top:8px;color:var(--ink-faint);font-size:var(--fs-md)}
 
-/* Choice tiles — the two-button root, and every fork below it. */
 .choice-grid{display:grid;gap:8px}
 
 .choice{
   display:flex;align-items:center;gap:var(--s-3);
   padding:14px 14px 14px 13px;
   border-radius:var(--r-md);
-  /* A row in a list, not a card. The hairline below does the grouping,
-     and the field stays visible straight through. */
   background:transparent;
   box-shadow:none;
   text-align:left;
@@ -477,19 +365,11 @@ ul{list-style:none}
 .choice-arrow{width:15px;height:15px;flex:none;fill:var(--ink-ghost);transition:transform var(--t-fast) var(--ease),fill var(--t-fast) var(--ease)}
 .choice:hover .choice-arrow{transform:translateX(2px);fill:var(--ink-soft)}
 
-/* Rows — games, files, recent reviews. */
 .row-list{
-  /* Not a scroll container. It used to be one with a height cap; without
-     the cap it is as tall as its content, so it can never scroll — and
-     `overscroll-behavior: contain` on an element that cannot scroll
-     *stops the gesture reaching the ancestor that can*. That is why a
-     list of a hundred games would not move under a finger. The step
-     above owns the scrolling now. */
   display:flex;flex-direction:column;gap:4px;
   min-height:0;
   margin-inline:-6px;padding-inline:6px;
 }
-
 
 .row{
   display:flex;align-items:center;gap:var(--s-3);
@@ -505,7 +385,6 @@ ul{list-style:none}
 .row-dim{color:var(--ink-ghost)}
 .row-arrow{width:14px;height:14px;flex:none;fill:var(--ink-ghost);opacity:0;transition:opacity var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
 .row:hover .row-arrow{opacity:1;transform:translateX(2px)}
-
 
 .field-row{display:flex;gap:8px}
 .field{
@@ -532,9 +411,6 @@ ul{list-style:none}
 
 .file-drop{
   display:flex;align-items:center;gap:var(--s-3);
-  /* Matches .choice exactly: the picker sits in the same flow as the
-     Browse/Paste cards, and a tinted card with a white icon (the inverse
-     of every other card) read as a different component. */
   padding:14px 14px 14px 13px;
   border-radius:var(--r-md);
   box-shadow:inset 0 0 0 1px var(--line);
@@ -582,20 +458,10 @@ ul{list-style:none}
 .weakness-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .weakness-rate{color:var(--ink-faint);font-size:var(--fs-sm);white-space:nowrap}
 
-/* ═══════════════ Review ═══════════════ */
-
 .review{
   min-height:0;
   display:grid;
   grid-template-columns:minmax(0,1fr);
-  /* The board's row is a *fixed* size and the insight takes what is left.
-
-     This is the opposite of the obvious arrangement, and deliberately so:
-     when the board was the flexible row, its size depended on how long
-     the current move's explanation happened to be, so the board visibly
-     resized as you stepped through the game. A board that changes size
-     under your thumb is worse than a slightly smaller one. Now the board
-     is the same size on every move and the explanation scrolls. */
   grid-template-rows:minmax(0,1fr) var(--board-size) auto auto;
   grid-template-areas:
     "insight"
@@ -605,12 +471,6 @@ ul{list-style:none}
   gap:var(--s-2);
   padding-top:var(--s-2);
   overflow:hidden;
-  /* Width first, capped by height so it still fits a short window. The
-     16px allowance is the eval rail and its gap, which come out of the
-     same row. */
-  /* Width is what limits the board on a phone, not height, so the only
-     way to make it bigger is to give back the padding either side. 6px
-     plus a 12px rail allowance instead of 16px plus 18px. */
   --board-size:min(
     calc(100vw - 12px - 12px),
     58dvh
@@ -622,31 +482,20 @@ ul{list-style:none}
 .band-insight{
   grid-area:insight;
   min-width:0;min-height:0;
-  /* Hugs its content instead of stretching to fill the row. A short
-     verdict is two lines, and a glass card stretched to 550px around two
-     lines of text is exactly the wasted space this redesign was for. It
-     still scrolls when an expanded explanation outgrows the row. */
   align-self:start;
   max-height:100%;
   display:flex;flex-direction:column;gap:var(--s-2);
-  /* Takes the leftover height rather than dictating it, and scrolls
-     inside itself when an explanation runs long. The screen never
-     scrolls, and the board never moves. */
   overflow-y:auto;overscroll-behavior:contain;
 }
 
 .band-board{
   grid-area:board;
   padding-inline:6px;
-  /* Explicit, not inherited from whatever the row happens to be. The
-     board must be the same size on every move in every layout. */
   height:var(--board-size);
   min-height:0;min-width:0;
   display:flex;flex-direction:column;gap:var(--s-2);
 }
 
-/* Only shown where there is room for it; on a phone this content lives
-   behind the two buttons under the strip instead. */
 .detail{display:none}
 
 .board-fit{
@@ -662,9 +511,6 @@ ul{list-style:none}
   border-radius:var(--r-md);
   overflow:hidden;
   background:var(--board-light);
-  /* The playable board is inset by the gutter the coordinates live in.
-     `border-box` keeps this element exactly --board-px square, so the
-     measurement `BoardStage` feeds back stays the size it always was. */
   box-sizing:border-box;
   padding:var(--board-gutter);
   box-shadow:0 0 0 1px rgba(18,19,23,.08),0 2px 6px rgba(18,19,23,.06),0 14px 40px rgba(18,19,23,.09);
@@ -673,10 +519,6 @@ ul{list-style:none}
 .board-container{width:100%;height:100%;position:relative}
 .board-container.cg-wrap{width:100%!important;height:100%!important;position:relative}
 
-/* Neutral two-tone board replacing chessground's brown theme.
-   A conic gradient, not the 45°-linear-gradient checkerboard trick —
-   that one antialiases along every diagonal and painted visible seams
-   right across the squares. */
 .board-container cg-board{
   background-color:var(--board-light);
   background-image:repeating-conic-gradient(
@@ -686,43 +528,18 @@ ul{list-style:none}
   background-size:25% 25%;
 }
 
-/* Coordinates sit in a margin around the board, not on the squares.
-   On the squares they landed underneath the back-rank pieces — the
-   letters ran straight through the rooks and knights — and no amount of
-   colour tuning fixes text and a piece occupying the same pixels.
-
-   The margin is uniform on all four sides so the board stays centred and
-   the frame reads as deliberate; only the left and bottom carry labels.
-   It costs about 4% of the board's width.
-
-   The ink is black at low alpha rather than a theme token, because the
-   board palette is a separate user choice: it has to stay legible on the
-   light frame of slate, classic, ocean and walnut alike. */
 .board-container.cg-wrap coords{
   z-index:4;font-family:var(--mono);font-size:10px;letter-spacing:0;font-weight:600;
 }
-/* Every label the same ink, set on the labels themselves.
-   Chessground's theme alternates them — half dark, half
-   `rgba(255,255,255,.8)` — because it assumes they sit on alternating
-   board squares. Out in the margin they all sit on the light frame, so
-   the white half simply vanished: a, c, e, g and 2, 4, 6, 8. A colour on
-   the container cannot fix that, since an inherited value loses to any
-   declaration on the element itself; these selectors have to outrank
-   chessground's own `.orientation-white .files :nth-child(odd)`. */
 .board-container.cg-wrap coords.files coord,
 .board-container.cg-wrap coords.ranks coord{
   color:rgba(18,20,26,.66);
 }
-/* Files below the board, each label centred under its own file. The row
-   fills the gutter exactly so the letters sit optically centred in it
-   rather than crowding either edge. */
 .board-container.cg-wrap coords.files{
   top:auto;bottom:calc(var(--board-gutter) * -1);
   left:0;width:100%;height:var(--board-gutter);
   display:flex;align-items:center;
 }
-/* Ranks to the left, the row spanning the board's full height so each
-   number lines up with the centre of its own rank. */
 .board-container.cg-wrap coords.ranks{
   left:calc(var(--board-gutter) * -1);
   top:0;bottom:0;height:auto;width:var(--board-gutter);
@@ -730,19 +547,10 @@ ul{list-style:none}
 }
 .board-container.cg-wrap coords.ranks coord{
   flex:1 1 0;display:flex;align-items:center;justify-content:center;
-  /* Chessground translates each rank label down by about 16px to sit it
-     in a square's upper corner. With the labels out in the margin that
-     shift just misaligns every number against its own rank. */
   transform:none;
 }
 
-/* ── Eval rail ──────────────────────────────────────────── */
-
 .eval-rail{
-  /* Shown at every width now. It is the fastest read of who stands
-     better, it costs 8px, and `BoardStage` reserves its width in the
-     board measurement whether or not it is painted — so hiding it on a
-     phone gave the board nothing back. */
   display:block;
   width:8px;flex:none;
   height:var(--board-px,100%);max-height:100%;
@@ -757,8 +565,6 @@ ul{list-style:none}
   transition:height 420ms var(--ease-enter);
 }
 
-/* ── Touch step zones ───────────────────────────────────── */
-
 .step-zones{
   position:absolute;inset:0;z-index:5;
   display:grid;grid-template-columns:38% 24% 38%;
@@ -768,9 +574,6 @@ ul{list-style:none}
 }
 .step-zone{position:relative;display:grid;place-items:center;cursor:pointer}
 .step-zone.is-center{cursor:default}
-
-/* Flashed on every tap and swipe, so touch gets the confirmation that
-   hover gives a mouse. */
 
 .jump-toast{
   position:absolute;left:50%;bottom:14px;z-index:6;
@@ -782,14 +585,10 @@ ul{list-style:none}
 }
 @keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(6px)}to{opacity:1;transform:translateX(-50%)}}
 
-/* ── Progress ───────────────────────────────────────────── */
-
 .progress{flex:none;display:flex;flex-direction:column;gap:5px;width:100%}
 .progress-label{display:flex;justify-content:space-between;gap:var(--s-2);color:var(--ink-faint);font-size:var(--fs-sm)}
 .progress-track{height:3px;border-radius:var(--r-pill);background:var(--canvas-deep);overflow:hidden}
 .progress-fill{height:100%;background:var(--ink);border-radius:inherit;transition:width var(--t-base) var(--ease)}
-
-/* ── Graph ──────────────────────────────────────────────── */
 
 .graph-meta{
   display:flex;align-items:center;gap:var(--s-2);flex-wrap:wrap;
@@ -803,9 +602,6 @@ ul{list-style:none}
 .graph-readout-move{overflow:hidden;text-overflow:ellipsis}
 .graph-readout-tag{font-size:var(--fs-xs);font-weight:500}
 
-/* The classification ramp, shared by the move strip, the readout, the
-   turning-point dots and the accuracy bars, so one word means the same
-   thing everywhere it appears. */
 .c-brilliant{color:var(--c-brilliant)}
 .c-great{color:var(--c-great)}
 .c-best{color:var(--c-best)}
@@ -833,9 +629,6 @@ ul{list-style:none}
 .graph-line{stroke:var(--ink-faint);stroke-width:1.4}
 .graph-point{pointer-events:none;stroke:var(--panel);stroke-width:1;transition:r var(--t-fast) var(--ease)}
 .graph-cursor{stroke:var(--ink);stroke-width:1;opacity:.5}
-/* `pan-y` claimed the horizontal axis for scrubbing, so a swipe could
-   never reach the scroller around a chart wider than the screen. Both
-   axes go back to the browser; selection happens on a tap instead. */
 .graph-hit{fill:transparent;cursor:pointer;touch-action:pan-x pan-y}
 .graph-point-brilliant{fill:var(--c-brilliant)}
 .graph-point-great{fill:var(--c-great)}
@@ -848,13 +641,7 @@ ul{list-style:none}
 .graph-point-miss{fill:var(--c-miss)}
 .graph-point-blunder{fill:var(--c-blunder)}
 
-/* ── Insight card ───────────────────────────────────────── */
-
 .insight{
-  /* The explanation reads on the app's own ground now, not on an
-     inverted slab. Losing the surface means losing the `--on-inverse`
-     text colours with it, so this switches back to the normal ink ramp —
-     see the `.insight-*` rules below. */
   display:flex;flex-direction:column;gap:var(--s-3);
   padding:var(--s-3) 0;
   color:var(--ink);
@@ -890,7 +677,6 @@ ul{list-style:none}
 .badge-miss{background:var(--c-miss)}
 .badge-blunder{background:var(--c-blunder)}
 .badge-motif{background:var(--tint);color:var(--ink-soft);box-shadow:inset 0 0 0 1px var(--line-soft)}
-/* On the light stage head the same badges need a light-surface variant. */
 
 .insight-block{padding-top:var(--s-3);border-top:1px solid var(--line-soft)}
 .insight-kicker{
@@ -903,7 +689,6 @@ ul{list-style:none}
 .insight-detail{margin-top:5px;color:var(--ink-soft);font-size:var(--fs-sm);line-height:1.55}
 .insight-warning{color:var(--c-inaccuracy)}
 
-/* Re-keyed on every move so the text arrives rather than swapping. */
 .insight-body{animation:insight-in 260ms var(--ease-enter) both}
 @keyframes insight-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
@@ -936,11 +721,6 @@ ul{list-style:none}
 .mode-toggle .chip-btn:hover:not(:disabled){background:var(--panel)}
 .mode-toggle .chip-btn.is-active{background:var(--panel);color:var(--ink);box-shadow:var(--e-1)}
 
-/* ── Practice (inline, inside the insight card) ─────────── */
-
-/* A text action in the card's kicker row: adding a button *below* the
-   explanation pushed the engine lines and the move list down the moment
-   it appeared. Sitting in space the row already occupies costs no height. */
 .kicker-action{
   padding:0;border:0;background:none;
   font-size:inherit;letter-spacing:inherit;text-transform:inherit;
@@ -958,10 +738,6 @@ ul{list-style:none}
 .practice-line.practice-poor .practice-title-verdict{color:var(--c-blunder)}
 .practice-reveal-inline{display:block;margin-top:var(--s-2);text-transform:none;letter-spacing:0;font-size:var(--fs-sm)}
 
-/* ── Larger windows ──────────────────────────────────────────
-   The shell is designed phone-first, so these only widen and
-   enlarge what is already there — no layout is introduced that
-   the small screen doesn't have. */
 @media (min-width: 860px) and (min-height: 700px){
   .home-panel{max-width:640px}
   .home-title{font-size:42px;line-height:46px}
@@ -978,8 +754,6 @@ ul{list-style:none}
   .home{gap:var(--s-8)}
 }
 
-/* ── Statistics ─────────────────────────────────────────── */
-
 .stat-grid{
   display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
   gap:var(--s-2);margin-bottom:var(--s-2);
@@ -991,7 +765,6 @@ ul{list-style:none}
 }
 .stat-value{font-size:var(--fs-title);font-weight:500;letter-spacing:-.4px;color:var(--ink)}
 .stat-name{font-size:var(--fs-sm);font-weight:500;color:var(--ink-soft)}
-/* The sentence that turns a number into something a beginner can act on. */
 .stat-help{font-size:var(--fs-xs);line-height:1.45;color:var(--ink-faint)}
 
 .opening-head{display:flex;align-items:baseline;gap:var(--s-2);flex-wrap:wrap}
@@ -1003,11 +776,6 @@ ul{list-style:none}
 .opening-note{color:var(--ink-soft);font-size:var(--fs-sm);line-height:1.55}
 .opening-note strong{color:var(--ink);font-weight:500}
 
-/* ── Openings ───────────────────────────────────────────── */
-
-/* The connected account, standing in for the sign-in form. Reads as an
-   identity rather than an input, which is the whole point: a remembered
-   account should never look like it is being asked for again. */
 .connected-head{
   display:flex;align-items:center;justify-content:space-between;
   gap:var(--s-3);
@@ -1038,8 +806,6 @@ ul{list-style:none}
 .opening-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .opening-meta{flex:none;color:var(--ink-faint);font-size:var(--fs-sm)}
 
-/* ── Phases ─────────────────────────────────────────────── */
-
 .phases{margin-bottom:var(--s-3)}
 .phases .section-label{margin-bottom:6px}
 .phase-row{
@@ -1053,15 +819,11 @@ ul{list-style:none}
 .phase-name{color:var(--ink-ghost);font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .phase-value{flex:none;font-weight:500}
 
-/* ── Clock ──────────────────────────────────────────────── */
-
 .time-chip{
   flex:none;padding:1px 7px;border-radius:var(--r-pill);
   background:var(--tint);color:var(--ink-faint);
   font-family:var(--mono);font-size:var(--fs-xs);
 }
-/* A move played on instinct is the interesting case, so it is the one
-   that gets colour. */
 .time-chip.is-rushed{background:rgba(232,163,61,.16);color:var(--c-inaccuracy)}
 
 .clocks{margin-bottom:var(--s-3)}
@@ -1076,8 +838,6 @@ ul{list-style:none}
 .clock-stat{flex:none;color:var(--ink)}
 .clock-label{flex:none;color:var(--ink-ghost);font-size:var(--fs-xs)}
 .clock-rushed{flex:1;text-align:right;color:var(--ink-faint);font-size:var(--fs-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-/* ── Turning points ─────────────────────────────────────── */
 
 .moments{margin-bottom:var(--s-3)}
 .moments .section-label{margin-bottom:6px}
@@ -1095,8 +855,6 @@ ul{list-style:none}
 .moment-move{flex:none;font-weight:500;color:var(--ink)}
 .moment-note{flex:1;min-width:0;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .moment-swing{flex:none;color:var(--ink-faint)}
-
-/* ── Accuracy ───────────────────────────────────────────── */
 
 .accuracy{
   display:grid;grid-template-columns:1fr 1fr;gap:1px;
@@ -1117,8 +875,6 @@ ul{list-style:none}
 .accuracy-inaccuracy{background:var(--c-inaccuracy)}
 .accuracy-mistake{background:var(--c-mistake)}
 .accuracy-blunder{background:var(--c-blunder)}
-
-/* ── Move list ──────────────────────────────────────────── */
 
 .move-list{display:flex;flex-direction:column}
 .turn-row{display:grid;grid-template-columns:26px 1fr 1fr;gap:3px;align-items:center}
@@ -1150,21 +906,9 @@ ul{list-style:none}
 .glyph-blunder{color:var(--c-blunder)}
 .move-item.is-active .glyph{color:var(--on-inverse)}
 
-/* ═══════════════ Landscape tablet — 900px and up ═══════════════
-   Board and pane side by side once there is real width for both.
-   Portrait tablets and phones stay stacked, which suits a square
-   board far better than a narrow split. */
-
-/* ═══════════════ Tablet — 768px and up ═══════════════
-   Enough width for two columns, so the readings that a phone puts behind
-   buttons become permanent. Same components, shown rather than hidden. */
-
 @media (min-width:768px){
   :root{--gutter:20px;--topbar-h:60px}
 
-  /* Two columns, so width is no longer the constraint the phone had.
-     360px is the widest the side column gets; the board takes what is
-     left of the viewport, still capped by height. */
   .review{
     --board-size:min(
       calc(100vw - 360px - (var(--gutter) * 3) - 16px),
@@ -1174,10 +918,6 @@ ul{list-style:none}
 
   .review{
     grid-template-columns:minmax(0,1fr) minmax(300px,360px);
-    /* The board spans the first two rows so the move list beside it gets
-       the flexible one — insight is sized by its content, the list takes
-       whatever is left. Distinct areas: two elements sharing one area
-       would simply stack on top of each other. */
     grid-template-rows:auto minmax(0,1fr) auto auto;
     grid-template-areas:
       "board   insight"
@@ -1185,8 +925,6 @@ ul{list-style:none}
       "strip   detail"
       "extras  detail";
   }
-  /* On a phone the insight is the first thing on screen; here it is
-     beside the board. Either way it is read before anything else. */
   .band-insight{
     grid-area:insight;
     max-height:42dvh;overflow-y:auto;
@@ -1201,16 +939,10 @@ ul{list-style:none}
   }
 }
 
-/* ═══════════════ Desktop — 1280px and up ═══════════════ */
-
 @media (min-width:1280px){
   :root{--gutter:24px}
   .review{grid-template-columns:minmax(0,1fr) minmax(360px,420px)}
 }
-
-/* ═══════════════ Narrow top bar ═══════════════
-   Below 600px the bar cannot hold players, brand and a labelled
-   engine pill at once. Engine state reads fine as colour alone. */
 
 @media (max-width:599px){
   .status-pill{padding:0;width:24px;height:24px;justify-content:center;border-radius:50%}
@@ -1221,13 +953,8 @@ ul{list-style:none}
   }
 }
 
-/* ═══════════════ Short windows ═══════════════
-   Trade chrome for board area rather than starting to scroll. */
-
 @media (max-height:640px){
   :root{--topbar-h:48px}
-  /* Give the board the height instead of the strip. Navigation still
-     works — it is on the board itself. */
   .move-strip{display:none}
 }
 
@@ -1235,28 +962,14 @@ ul{list-style:none}
   *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
 }
 
-/* ── Piece field ─────────────────────────────────────────────
-   The website's drifting chess field, behind the whole shell.
-   Viewport-fixed rather than a child of any screen, so switching
-   between the menus and a review does not restart it, and so the
-   component can read pointer coordinates straight off the event
-   without a bounding-rect measurement per move. */
 .piece-field{
   position:fixed;inset:0;
   width:100%;height:100%;
   z-index:0;
   pointer-events:none;
 }
-/* Everything the app draws sits above the field. The topbar keeps its
-   own higher stacking so menus and popovers still clear the content. */
 .home,.review{position:relative;z-index:1}
 
-/* ── Performance tone ────────────────────────────────────────
-   A statistic reads as a colour before it reads as a number, which is
-   the point for a player who does not yet know what 72% accuracy means.
-   Green is doing well, amber is middling, red is the thing to work on;
-   the bands themselves live in `lib/tone.ts` so every surface judges the
-   same figure the same way. */
 .stat-card.is-good{
   background:color-mix(in srgb, var(--c-best) 11%, var(--panel-sunken));
   box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--c-best) 26%, transparent);
@@ -1273,25 +986,12 @@ ul{list-style:none}
 .stat-card.is-ok .stat-value{color:var(--tone-ok-ink)}
 .stat-card.is-weak .stat-value{color:var(--tone-weak-ink)}
 
-/* Rows carry the same judgement as a severity stripe rather than a wash:
-   a list of openings has to stay scannable, and five tinted blocks in a
-   column would read as five different surfaces. */
 .row.is-good{box-shadow:inset 3px 0 0 var(--c-best)}
 .row.is-ok{box-shadow:inset 3px 0 0 var(--c-inaccuracy)}
 .row.is-weak{box-shadow:inset 3px 0 0 var(--c-blunder)}
 
-/* ── Screen entrance ─────────────────────────────────────────
-   The card already fades its whole step in. Staggering the step's own
-   children on top of that makes moving between home, library, statistics
-   and an opening feel like a screen arriving rather than content being
-   swapped underneath a static frame. */
 .home-step > *{
   animation:step-in var(--t-enter) var(--ease-enter) both;
-  /* Never shrink. The step is a bounded flex column so it can scroll, and
-     a flex item's default `flex-shrink:1` makes it give up height instead
-     of overflowing into that scroll — measured on a 360x665 phone, the
-     openings list was squeezed to exactly 0px tall while its rows spilled
-     out of the clipped card, so the section rendered as nothing at all. */
   flex:none;
 }
 .home-step > *:nth-child(1){animation-delay:20ms}
@@ -1308,12 +1008,6 @@ ul{list-style:none}
   .home-step > *{animation:none}
 }
 
-/* ── Statistics on a phone ───────────────────────────────────
-   The card stacks value → name → help, which costs about 110px each
-   and pushed the openings list two screens down on a 360px device.
-   Setting the number beside its label instead roughly halves that,
-   without dropping the plain-language sentence that makes the figure
-   mean something to a beginner. */
 @media (max-width:599px){
   .stat-card{
     display:grid;
@@ -1327,17 +1021,9 @@ ul{list-style:none}
   .stat-value{grid-area:value;align-self:center}
   .stat-name{grid-area:name;align-self:end}
   .stat-help{grid-area:help;align-self:start}
-  /* A card with no help sentence keeps the number vertically centred
-     against its label rather than hanging off the top row. */
   .stat-card:not(:has(.stat-help)){grid-template-areas:"value name"}
 }
 
-/* ── Move strip ──────────────────────────────────────────────
-   The whole game as one self-scrolling row. This replaces both the
-   stepper and, on a phone, the vertical move list: the board already
-   steps on tap and jumps on double-tap, so a row of arrow buttons spent
-   44px on something the board does better. What the board cannot show is
-   where you are in the game, which is what this is for. */
 .move-strip{
   grid-area:strip;
   display:flex;gap:4px;
@@ -1348,9 +1034,6 @@ ul{list-style:none}
 .move-strip::-webkit-scrollbar{display:none}
 
 .strip-item{
-  /* Full ink, not the soft ramp: measured 3.79:1 on the light theme's
-     tinted chip, under the 4.5 this size of text needs. The move number
-     beside it stays faint, so the hierarchy survives the change. */
   color:var(--ink);
   flex:none;
   display:inline-flex;align-items:baseline;gap:5px;
@@ -1364,19 +1047,13 @@ ul{list-style:none}
 .strip-item:hover{background:var(--tint-strong)}
 .strip-item .strip-no{font-size:var(--fs-xs);color:var(--ink-faint);font-family:var(--mono)}
 .strip-item.is-start{color:var(--ink-faint)}
-/* Two classes, so this beats the classification colour on the selected
-   move without an !important. */
 .strip-item.is-current{
   background:var(--primary);color:var(--on-primary);
   box-shadow:var(--e-1);
 }
 .strip-item.is-current .strip-no{color:var(--on-primary);opacity:.72}
-/* Beats the classification colour on the selected move without an
-   !important: three classes to its one. */
 .strip-item.is-current .strip-san{color:var(--on-primary)}
 
-/* ── Extras ──────────────────────────────────────────────────
-   The way into the readings that used to sit permanently in the layout. */
 .extras{
   grid-area:extras;
   display:flex;gap:var(--s-2);
@@ -1397,8 +1074,6 @@ ul{list-style:none}
 .extra-btn:hover:not(:disabled){background:var(--tint-strong);color:var(--ink)}
 .extra-btn:disabled{opacity:.38;cursor:default}
 
-/* ── Overlay ─────────────────────────────────────────────────
-   A sheet on a phone, a centred dialog from tablet up. */
 .overlay{
   position:fixed;inset:0;z-index:60;
   display:flex;align-items:flex-end;justify-content:center;
@@ -1430,15 +1105,10 @@ ul{list-style:none}
 .overlay-body{
   min-height:0;
   overflow-y:auto;
-  /* Explicitly hidden: `overflow-y:auto` alone makes the x axis `auto`
-     too, so the panel scrolled sideways as a whole and the chart looked
-     like it was overflowing rather than scrolling inside itself. */
   overflow-x:hidden;
   overscroll-behavior:contain;
   padding:0 var(--gutter) var(--s-5);
 }
-/* Given real height here, the curve is finally readable and its markers
-   are big enough to hit with a thumb. */
 .overlay-body .game-graph{height:168px;min-height:168px}
 
 .clock-current{margin-top:var(--s-3);font-size:var(--fs-sm);color:var(--ink-soft)}
@@ -1450,11 +1120,6 @@ ul{list-style:none}
   .overlay-panel{border-radius:var(--r-xl);max-height:80dvh}
 }
 
-
-/* ── Glass surfaces ──────────────────────────────────────────
-   One definition, three users. The inner top line is the specular
-   highlight that makes the material read as lit rather than merely
-   translucent; the hairline ring is its edge. */
 .glass{
   background:var(--glass-fill);
   backdrop-filter:var(--glass-blur);
@@ -1464,8 +1129,6 @@ ul{list-style:none}
     inset 0 0 0 1px var(--glass-edge),
     var(--glass-shadow);
 }
-/* Without backdrop-filter the fill alone would leave the piece field
-   legible straight through the text, so it falls back to solid. */
 @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))){
   .glass{background:var(--panel)}
 }
@@ -1482,11 +1145,6 @@ ul{list-style:none}
   padding:var(--s-3);
   border-radius:var(--r-lg);
 }
-/* A sticky strip at the foot of the scroll area, fading the last line
-   into the card rather than cutting it off mid-sentence. A mask on the
-   element itself would fade the glass and its blurred edge with it, so
-   the gradient goes inside the scroller instead. Zero height when the
-   content fits, because there is nothing to scroll past. */
 .band-insight::after{
   content:'';
   position:sticky;bottom:calc(var(--s-3) * -1);
@@ -1495,13 +1153,7 @@ ul{list-style:none}
   pointer-events:none;
 }
 
-/* Denser than the inline glass. A modal is read on its own terms, and
-   at the band's transparency the board and explanation behind it ghosted
-   through the first few lines. */
 .overlay-panel.glass{
-  /* Nearly solid. At 86% the board and the explanation behind it still
-     ghosted through the first lines, which is the opposite of what the
-     glass is for here. */
   background:color-mix(in srgb, var(--panel) 94%, transparent);
   backdrop-filter:blur(30px) saturate(160%);
   -webkit-backdrop-filter:blur(30px) saturate(160%);
@@ -1511,9 +1163,6 @@ ul{list-style:none}
   .overlay-panel{border-radius:var(--r-xl)}
 }
 
-/* ── Graph scroller ──────────────────────────────────────────
-   A long game gets width instead of compression, so its markers stay
-   far enough apart to tell apart and to hit with a thumb. */
 .graph-scroll{
   overflow-x:auto;overflow-y:hidden;
   overscroll-behavior-x:contain;
@@ -1524,17 +1173,10 @@ ul{list-style:none}
 .graph-scroll::-webkit-scrollbar{display:none}
 .graph-track{display:block}
 
-/* "Turning points" sat hard against the chart above it. */
 .overlay-body .moments{margin-top:var(--s-5)}
 .overlay-body .phases{margin-top:var(--s-5)}
 .overlay-body .section-label{margin-bottom:var(--s-2);display:block}
 
-/* ── Best-move arrow ─────────────────────────────────────────
-   The arrow draws itself from the origin square to the target, head
-   last, then holds. It is the one thing a static arrow cannot do: pull
-   the eye in the direction the piece actually travels. Chessground's
-   shape layer uses an 8x8 viewBox, so a dash of 12 units is longer than
-   any arrow on the board and reveals the whole line exactly once. */
 .cg-wrap .cg-shapes line{
   stroke-dasharray:12;
   animation:arrow-draw 240ms var(--ease-enter) both;
@@ -1556,13 +1198,6 @@ ul{list-style:none}
   .cg-wrap .cg-shapes polygon{animation:none;stroke-dasharray:none}
 }
 
-
-/* ── Glass on the things you press and read ──────────────────
-   A lighter mix than the big surfaces: a shorter blur radius, and no
-   drop shadow, so a list of them reads as one material rather than a
-   stack of floating cards. Every one of these is a separately blurred
-   layer, which is the cost of the look — the planned setting to freeze
-   the background animation is what makes it cheap. */
 .choice,
 .row,
 .extra-btn,
@@ -1581,14 +1216,10 @@ ul{list-style:none}
   .choice,.row,.extra-btn,.strip-item,.moment,.stat-card{background:var(--panel)}
 }
 
-/* The tinted statistic cards keep their meaning: the tone is the point,
-   so it sits on top of the glass rather than being replaced by it. */
 .stat-card.is-good{background:color-mix(in srgb, var(--c-best) 16%, var(--glass-fill))}
 .stat-card.is-ok{background:color-mix(in srgb, var(--c-inaccuracy) 16%, var(--glass-fill))}
 .stat-card.is-weak{background:color-mix(in srgb, var(--c-blunder) 16%, var(--glass-fill))}
 
-/* The selected move stays solid — it is the one thing on the strip that
-   must not be see-through. */
 .strip-item.is-current{
   background:var(--primary);
   backdrop-filter:none;-webkit-backdrop-filter:none;
@@ -1599,9 +1230,6 @@ ul{list-style:none}
   background:color-mix(in srgb, var(--panel) 78%, transparent);
 }
 
-/* The insight's expand control. Sits at the end of the summary rather
-   than in a corner, so it reads as "there is more of this sentence"
-   rather than as window chrome. */
 .insight-more{
   align-self:flex-start;
   display:inline-flex;align-items:center;gap:4px;
@@ -1617,9 +1245,6 @@ ul{list-style:none}
 }
 .insight-more svg.is-open{transform:rotate(-90deg)}
 
-
-/* ── Account menu ────────────────────────────────────────────
-   Hangs off the title, which is the thing it acts on. */
 .title-action{
   display:inline-flex;align-items:center;gap:5px;min-width:0;
   color:var(--ink);font-weight:500;
@@ -1633,9 +1258,6 @@ ul{list-style:none}
 
 .menu-scrim{position:fixed;inset:0;z-index:39}
 .account-menu{
-  /* Absolute inside `.topbar-title`, so it hangs directly under the name
-     it acts on. Fixed-and-centred put it in the middle of the screen
-     while the title sat left of centre, which read as misaligned. */
   position:absolute;z-index:40;
   top:calc(100% + 8px);left:0;
   min-width:200px;
@@ -1650,27 +1272,17 @@ ul{list-style:none}
 }
 .account-menu button:hover{background:var(--tint)}
 
-/* Position in the list, not a game id — it keeps your place while
-   scrolling a hundred rows. */
 .row-no{
   flex:none;width:2.2ch;text-align:right;
   color:var(--ink-faint);font-size:var(--fs-sm);
   font-variant-numeric:tabular-nums;
 }
 
-/* ── Board palettes ──────────────────────────────────────────
-   Deliberately after the theme block, and deliberately the same in both
-   themes: a walnut board should look like walnut whether the app around
-   it is light or dark. Only two tokens are involved, which is why board
-   colours cost nothing to ship while extra piece sets would not. */
 :root[data-board="slate"]   { --board-light:#eef1f6; --board-dark:#aebbcc }
 :root[data-board="classic"] { --board-light:#f0d9b5; --board-dark:#b58863 }
 :root[data-board="ocean"]   { --board-light:#dce9f0; --board-dark:#7fa3b8 }
 :root[data-board="walnut"]  { --board-light:#e8d3b0; --board-dark:#8b5e3c }
 
-/* ── Settings ────────────────────────────────────────────────
-   One question per block: what it is, what it does in plain words, then
-   the choice itself. */
 .settings{gap:var(--s-5)}
 
 .setting{display:flex;flex-direction:column;gap:var(--s-2)}
@@ -1710,7 +1322,6 @@ ul{list-style:none}
   color:var(--ink);
   box-shadow:inset 0 0 0 2px var(--primary);
 }
-/* Two squares in the board's own colours — a better label than the name. */
 .swatch-tiles{display:grid;grid-template-columns:14px 14px;flex:none;border-radius:4px;overflow:hidden}
 .swatch-light,.swatch-dark{display:block;height:28px}
 .board-swatch[data-swatch="slate"]   .swatch-light{background:#eef1f6}
@@ -1727,7 +1338,6 @@ ul{list-style:none}
   font-size:var(--fs-sm);line-height:1.5;color:var(--ink-faint);
 }
 
-/* Explains only the arrow colours currently on the board. */
 .arrow-key{
   display:flex;flex-wrap:wrap;gap:4px var(--s-3);
   margin-top:var(--s-2);
@@ -1743,8 +1353,6 @@ ul{list-style:none}
 .arrow-dot.is-yellow{background:#d9a441}
 .arrow-dot.is-red{background:#c0392b}
 
-/* Each service in its own colour, so the row is recognisable before the
-   name is read. */
 .choice-icon.is-lichess{background:rgba(232,235,241,.10);box-shadow:inset 0 0 0 1px rgba(232,235,241,.22)}
 .choice-icon.is-lichess svg{fill:#e8ebf1}
 :root:not([data-theme="dark"]) .choice-icon.is-lichess{background:rgba(18,19,23,.07);box-shadow:inset 0 0 0 1px rgba(18,19,23,.16)}
@@ -1752,9 +1360,6 @@ ul{list-style:none}
 .choice-icon.is-chesscom{background:rgba(129,175,85,.15);box-shadow:inset 0 0 0 1px rgba(129,175,85,.34)}
 .choice-icon.is-chesscom svg{fill:#81af55}
 
-/* ── Language picker ─────────────────────────────────────────
-   A list rather than segments: there are more of these than fit a row,
-   and each carries a second line. */
 .language-list{display:flex;flex-direction:column;gap:4px}
 .language{
   display:flex;align-items:baseline;gap:var(--s-2);
@@ -1774,19 +1379,10 @@ ul{list-style:none}
 .language-english{font-size:var(--fs-sm);color:var(--ink-faint)}
 .language-state{margin-left:auto;font-size:var(--fs-sm);color:var(--ink-faint)}
 
-/* ── First-run download ───────────────────────────────────────────────
-   The one screen a fresh install opens on. It has a single job — explain
-   what is about to be fetched and how large it is — so it is narrow,
-   centred, and carries nothing else. */
-/* Centred rather than top-anchored: this screen holds one short
-   message and one button, and pinned to the top it leaves the lower two
-   thirds of a phone empty. */
 .home:has(.home-step.gate){justify-content:center}
 .gate{
   max-width:460px;margin-inline:auto;gap:var(--s-4);
   padding:var(--s-6);border-radius:var(--r-lg);
-  /* Glass, like every other readable surface in the app — this one is
-     read before anything else in it, so it should not be the exception. */
   overflow:visible;flex:0 1 auto;
 }
 .gate-title{font-size:var(--fs-title);line-height:var(--lh-title);letter-spacing:var(--ls-title);font-weight:640;color:var(--ink);margin:0}
@@ -1796,8 +1392,6 @@ ul{list-style:none}
 .gate-item{
   display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-3);
   padding:11px 0;font-size:var(--fs-sm);
-  /* A hairline between rows rather than a box around each: this is one
-     list, not a set of unrelated cards. */
   box-shadow:inset 0 -1px 0 var(--line);
 }
 .gate-item:last-child{box-shadow:none}

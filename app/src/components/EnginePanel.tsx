@@ -8,7 +8,6 @@ import { IconChevronRight } from './icons';
 import { useT } from '../lib/i18n';
 import { VERDICT_COPY, type PracticeAttempt } from '../lib/practice';
 
-/** The live drill, when one is running. */
 export interface PracticeView {
   attempts: PracticeAttempt[];
   status: 'awaiting' | 'judging' | 'revealed';
@@ -21,16 +20,9 @@ interface EnginePanelProps {
   classification?: Classification;
   explanation?: MoveExplanation;
   slmState?: SlmState;
-  // Present only when a deep dive can be requested for the current move
-  // (i.e. review has classified it); undefined hides the button entirely
-  // rather than showing a disabled one.
   onRequestDeepDive?: () => void;
   loading?: boolean;
   progressPercent?: number | null;
-  /* Practice lives inside this card rather than below it. Appending a
-     block pushed the explanation, the engine lines and the move list
-     down the moment the button appeared; swapping the card's body keeps
-     the layout still whether a drill is running or not. */
   practice?: PracticeView | null;
   canPractice?: boolean;
   practiceBestSan?: string;
@@ -93,7 +85,6 @@ function EnginePanel({
     return analysis && analysis.bestMove ? uciToSan(fen, analysis.bestMove) : '–';
   }, [fen, analysis?.bestMove]);
 
-  // Newest attempt only — see the comment on the practice block below.
   const last = practice && practice.attempts.length > 0
     ? practice.attempts[practice.attempts.length - 1]
     : null;
@@ -104,15 +95,8 @@ function EnginePanel({
     return Math.round(winPercent(toCpValue(analysis.evalCp, analysis.evalMate)));
   }, [analysis?.evalCp, analysis?.evalMate]);
 
-  // What is now coming at the player, as opposed to what their own move
-  // did. Only shown when there is something concrete to name.
   const threat = useMemo(() => describeThreat(fen), [fen]);
 
-  /** Collapsed shows the verdict and one sentence; everything else is a
-   *  tap away. The board is the thing that should own the screen, and
-   *  this panel was taking a third of it to restate the same move in six
-   *  registers. Resets on every move so stepping never inherits an
-   *  expanded box from the move before. */
   const tr = useT();
   const [expanded, setExpanded] = useState(false);
   useEffect(() => { setExpanded(false); }, [fen]);
@@ -128,10 +112,7 @@ function EnginePanel({
           {loading && !analysis
             ? `Analysing${progressPercent !== null ? ` · ${progressPercent}%` : '…'}`
             : formatEval(analysis?.evalCp ?? null, analysis?.evalMate ?? null)}
-          {/* "+1.40" means little below about 1500. The win probability
-              says the same thing in a unit anyone can act on, and it also
-              explains why the same slip matters less from a winning
-              position than from a level one. */}
+          {}
           {!loading && analysis && winChance !== null && (
             <span className="insight-odds">{winChance}% for White</span>
           )}
@@ -151,9 +132,7 @@ function EnginePanel({
 
       {explanation && !practice && (
         <div className="insight-block insight-body" key={explanation.title + explanation.summary}>
-          {/* "Why this matters" was a label that never said anything the
-              sentence under it did not. The practice action stays, because
-              it is the one thing here you can act on. */}
+          {}
           {canPractice && onStartPractice && (
             <div className="insight-kicker">
               <button type="button" className="kicker-action" onClick={onStartPractice}>
@@ -168,10 +147,7 @@ function EnginePanel({
             <>
               <p className="insight-detail">{explanation.detail}</p>
               {threat && <p className="insight-threat">{threat}</p>}
-              {/* Built from the arrows actually on the board, so it never
-                  explains a colour that is not there. Four colours with
-                  fixed meanings are learnable; an unexplained fan of
-                  arrows is not. */}
+              {}
               {explanation.shapes.length > 0 && (
                 <ul className="arrow-key">
                   {(
@@ -224,8 +200,7 @@ function EnginePanel({
                   <span className="practice-title-loss num">−{(last.lossCp / 100).toFixed(2)}</span>
                 )}
               </div>
-              {/* Only the newest attempt is shown. Listing every try grew
-                  the card on each move and pushed everything below it. */}
+              {}
               <p className="insight-summary">
                 {last.reason ?? (last.verdict === 'best'
                   ? 'That is the move the engine plays here.'
@@ -258,9 +233,7 @@ function EnginePanel({
         </div>
       )}
 
-      {/* Everything from here down is detail: the depth the engine
-          reached, the line it wants, and the on-demand model. Useful when
-          you go looking, noise on every single move. */}
+      {}
       {expanded && onRequestDeepDive && !slmState && (
         <button type="button" className="deep-dive-btn" onClick={onRequestDeepDive}>
           Explain in depth (experimental)
@@ -306,6 +279,4 @@ function EnginePanel({
   );
 }
 
-// Only meaningful because App passes a stable `onRequestDeepDive` — an
-// inline arrow there would change identity every render and defeat this.
 export default memo(EnginePanel);

@@ -19,13 +19,11 @@ describe('openingLine', () => {
   test('walks the theory and names the alternatives at each step', () => {
     const line = openingLine(parsePgn('1. e4 e5 2. Nf3 Nc6 *'));
     expect(line[0]).toMatchObject({ ply: 0, san: 'e4', inBook: true });
-    // Real alternatives from the mined book, not the move itself.
     expect(line[0].alternatives.length).toBeGreaterThan(0);
     expect(line[0].alternatives).not.toContain('e4');
   });
 
   test('stops at the move that left book', () => {
-    // Na3 is the one first move the corpus does not play.
     const line = openingLine(parsePgn('1. Na3 e5 2. Nc4 d5 *'));
     expect(line).toHaveLength(1);
     expect(line[0]).toMatchObject({ san: 'Na3', inBook: false });

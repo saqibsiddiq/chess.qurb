@@ -2,7 +2,7 @@
 
 Each file here is one language's interface strings. The app bundles
 English and downloads the rest from `https://chess.qurb.cloud/locales/`
-the first time a language is picked, then keeps it on the device — so a
+the first time a language is picked, then keeps it on the device, so a
 language is fetched once and works offline afterwards.
 
 ## Adding a language
@@ -10,7 +10,7 @@ language is fetched once and works offline afterwards.
 1. Copy `template.json` to `<code>.json`, where `<code>` is the language's
    two-letter code (`fr`, `de`, …).
 2. Replace each English value with the translation. **Leave the keys
-   alone** — they are what the app looks up.
+   alone**. They are what the app looks up.
 3. Add the language to `LANGUAGES` in `app/src/lib/i18n.ts` so it appears
    in Settings.
 
@@ -30,4 +30,4 @@ language is fetched once and works offline afterwards.
   rather than translating sentences, so they stay English for now.
 
 `es.json` was written alongside the feature and has not been reviewed by a
-native speaker — treat it as a starting point rather than finished work.
+native speaker, so treat it as a starting point rather than finished work.

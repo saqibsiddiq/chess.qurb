@@ -4,11 +4,8 @@ export interface ParsedMove {
   moveNumber: number;
   color: 'w' | 'b';
   san: string;
-  uci: string; // e.g. "e2e4", or "e7e8q" for a promotion
+  uci: string;
   fenAfter: string;
-  /** Seconds left on the mover's clock after this move, from the PGN's
-   *  `[%clk ...]` annotation. Both Lichess and Chess.com supply it on
-   *  every move; absent for PGNs that carry no clock data. */
   clock?: number;
 }
 
@@ -58,18 +55,14 @@ function loadTolerantPgn(
 
   for (const token of moveTokens(pgn)) {
     const cleanToken = token.replace(/[!?]+$/, '').replace(/[+#]$/, '');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let parsedMove: any = null;
 
-    // 1. Try standard move parsing with the raw token
     try {
       parsedMove = chess.move(token);
     } catch {
-      // 2. Try with cleanToken (stripped of checks and annotations)
       try {
         parsedMove = chess.move(cleanToken);
       } catch {
-        // 3. Try UCI move notation (e.g. e7c7 or e2e4)
         if (/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(cleanToken)) {
           try {
             parsedMove = chess.move({
@@ -78,11 +71,9 @@ function loadTolerantPgn(
               promotion: cleanToken[4] as any,
             });
           } catch {
-            // ignore
           }
         }
 
-        // 4. Try matching against legal moves with tolerant disambiguation (e.g. Rcc7 -> Rc7)
         if (!parsedMove) {
           const legalMoves = chess.moves({ verbose: true });
           const strippedClean = stripDisambiguation(cleanToken);
@@ -104,7 +95,6 @@ function loadTolerantPgn(
               promotion: candidates[0].promotion,
             });
           } else if (candidates.length > 1) {
-            // Check if cleanToken had an origin hint (e.g. rank or file like 'c' or '7')
             const origMatch = cleanToken.match(/^([KQRBN])([a-h1-8]+)/);
             if (origMatch) {
               const spec = origMatch[2];
@@ -147,20 +137,6 @@ function loadTolerantPgn(
   return { headers, moves };
 }
 
-/**
- * Turns a raw PGN string into a list of moves, each carrying the FEN
- * position that results from playing it, plus a UCI-style move string
- * (from+to+promotion).
- */
-/**
- * Clock readings from `[%clk ...]` comments, keyed by the FEN of the
- * position the comment is attached to.
- *
- * Keyed by position rather than zipped by index on purpose: a PGN with
- * clocks on only some moves would silently misalign every later reading
- * if the two lists were zipped, attributing one player's time to another
- * player's move.
- */
 function clocksByFen(chess: Chess): Map<string, number> {
   const byFen = new Map<string, number>();
   for (const { fen, comment } of chess.getComments()) {
@@ -172,8 +148,6 @@ function clocksByFen(chess: Chess): Map<string, number> {
   return byFen;
 }
 
-/** `H:MM:SS` or `H:MM:SS.s`. Kept local so parsePgn has no import cycle
- *  with the clock module, which depends on ParsedGame. */
 function parseClockText(text: string): number | null {
   const m = text.match(/(\d+):(\d{1,2}):(\d{1,2}(?:\.\d+)?)/);
   if (!m) return null;
@@ -209,7 +183,6 @@ export function parsePgn(pgn: string): ParsedGame {
   const startingFen = headers.SetUp === '1' && headers.FEN ? headers.FEN : new Chess().fen();
   const clocks = clocksByFen(chess);
 
-  // Replay the game move by move on a fresh board to capture FENs & UCI notations
   const replay = new Chess(startingFen);
   let moveNumber = Number(startingFen.split(' ')[5]) || 1;
   const moves: ParsedMove[] = parsedMoves.map((parsedMove) => {

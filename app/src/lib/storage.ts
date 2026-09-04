@@ -5,11 +5,6 @@ import type { ParsedGame } from './parsePgn';
 import { bookExitPly, openingFrom } from './openings';
 import { terminationFrom } from './termination';
 
-// Mirrors src-tauri/src/storage.rs. Only the engine output is persisted —
-// classifications and explanation text are recomputed on load, which was
-// measured at ~0.37ms per move (~30ms for a whole game). That keeps a
-// single source of truth for the review logic and means improvements to
-// the classifier apply retroactively to games reviewed long ago.
 export interface ReviewSummary {
   id: string;
   savedAt: number;
@@ -24,12 +19,9 @@ export interface ReviewSummary {
   blackCounts: Partial<Record<Classification, number>>;
   whiteMotifs: Record<string, number>;
   blackMotifs: Record<string, number>;
-  /** Opening identity, and the ply at which the game left the mined
-   *  book. Optional: summaries saved before this existed lack them. */
   opening?: string | null;
   eco?: string | null;
   bookExitPly?: number | null;
-  /** How the game ended, e.g. `timeout`. */
   termination?: string | null;
 }
 
@@ -41,18 +33,12 @@ export interface StoredReview {
   multiPv: number;
 }
 
-/// Content hash of the PGN, so importing the same game twice updates one
-/// entry instead of accumulating duplicates. FNV-1a in hex — short,
-/// stable, and (per storage.rs's validator) filesystem-safe by
-/// construction.
 export function reviewId(pgn: string): string {
   let hash = 2166136261;
   for (let i = 0; i < pgn.length; i++) {
     hash ^= pgn.charCodeAt(i);
     hash = Math.imul(hash, 16777619);
   }
-  // Mix in the length too: FNV alone collides more readily on inputs that
-  // share long prefixes, which PGNs of the same opening very much do.
   return `${(hash >>> 0).toString(16)}-${pgn.length.toString(16)}`;
 }
 
@@ -66,9 +52,6 @@ function tally(
     if (move.color !== color) continue;
     counts[move.classification] = (counts[move.classification] ?? 0) + 1;
     const motif = move.explanation.motif;
-    // 'positive' and 'evaluation' aren't tactical motifs, just the
-    // narrative labels for "nothing specific happened" — counting them
-    // would swamp the genuinely interesting ones in a weakness report.
     if (motif && motif !== 'positive' && motif !== 'evaluation' && motif !== 'none') {
       motifs[motif] = (motifs[motif] ?? 0) + 1;
     }

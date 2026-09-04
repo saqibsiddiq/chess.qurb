@@ -36,17 +36,11 @@ describe('reviewId', () => {
   });
 
   test('differs for PGNs sharing a long prefix', () => {
-    // Games from the same opening share hundreds of leading characters,
-    // which is exactly where a plain rolling hash is weakest — this is
-    // why the length is mixed into the id.
     const base = '[Event "x"]\n[White "alice"]\n[Black "bob"]\n1. e4 e5 2. Nf3 Nc6 3. Bb5 ';
     expect(reviewId(`${base}a6 4. Ba4 *`)).not.toBe(reviewId(`${base}Nf6 4. O-O *`));
   });
 
   test('produces only filesystem-safe characters', () => {
-    // storage.rs rejects anything outside [A-Za-z0-9-]; an id that can't
-    // survive that check would fail only at save time, on the user's
-    // machine, which is a bad place to find out.
     for (const pgn of ['', '1. e4 *', '[White "a/b"]\n1. d4 ..'.repeat(20)]) {
       expect(reviewId(pgn)).toMatch(/^[A-Za-z0-9-]+$/);
     }
@@ -71,9 +65,6 @@ describe('buildSummary', () => {
 
     expect(summary.whiteCounts).toEqual({ blunder: 1, best: 1, good: 1 });
     expect(summary.blackCounts).toEqual({ blunder: 2 });
-    // Only real tactical motifs are counted — 'positive' and 'evaluation'
-    // are narrative labels for "nothing specific happened" and would
-    // swamp a weakness report if tallied.
     expect(summary.whiteMotifs).toEqual({ hanging_piece: 1 });
     expect(summary.blackMotifs).toEqual({ fork: 1, hanging_piece: 1 });
   });

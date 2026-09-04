@@ -28,15 +28,11 @@ function review(moves: ReviewedMove[]): GameReview {
 
 describe('findCriticalMoments', () => {
   test('ignores moves that barely move the needle', () => {
-    // A few tenths of a pawn either way is ordinary play.
     const r = review([move('w', 20), move('b', 10), move('w', 30)]);
     expect(findCriticalMoments(r)).toEqual([]);
   });
 
   test('ranks by win probability, not centipawns', () => {
-    // Move 0: White throws a level game (0 -> -400), a huge win-% swing.
-    // Move 2: White drops another 600cp, but from an already-lost
-    // position, so it barely changes the likely result.
     const r = review([
       move('w', -400, { san: 'Qxh7' }),
       move('b', -400, { san: 'Kxh7' }),
@@ -44,14 +40,12 @@ describe('findCriticalMoments', () => {
     ]);
     const found = findCriticalMoments(r);
     expect(found[0].move.san).toBe('Qxh7');
-    // The second slip is worth less despite giving up more material.
     const first = found.find((m) => m.move.san === 'Qxh7')!;
     const later = found.find((m) => m.move.san === 'Rb1');
     if (later) expect(later.swing).toBeLessThan(first.swing);
   });
 
   test('flags handing over the advantage as a turning point', () => {
-    // White is level, then ends up clearly worse: the game changed hands.
     const r = review([move('w', -500, { san: 'Nd5' })]);
     const [moment] = findCriticalMoments(r);
     expect(moment.turningPoint).toBe(true);
@@ -59,8 +53,6 @@ describe('findCriticalMoments', () => {
   });
 
   test('a slip inside a still-winning position is not a turning point', () => {
-    // White goes from overwhelming to merely winning — costly, but the
-    // advantage never changed hands.
     const r = review([move('w', 900), move('b', 900), move('w', 300, { san: 'Rc1' })]);
     const found = findCriticalMoments(r);
     const slip = found.find((m) => m.move.san === 'Rc1');
@@ -68,8 +60,6 @@ describe('findCriticalMoments', () => {
   });
 
   test('reads the swing from the moving side, not from White', () => {
-    // Black to move at +400 for White (bad for Black) and ends at +900:
-    // Black lost ground, so this must register as Black's mistake.
     const r = review([move('w', 400), move('b', 900, { san: 'Qa5' })]);
     const found = findCriticalMoments(r);
     expect(found[0].move.san).toBe('Qa5');

@@ -9,12 +9,6 @@ import {
 
 const KEY = 'chesy.settings';
 
-/**
- * The suite runs on node, with no DOM — the rest of the codebase's tests
- * are pure logic and adding jsdom would slow all of them down for one
- * module. A few lines of in-memory storage is enough to exercise the part
- * that matters here, which is the validation, not the browser API.
- */
 function stubStorage(): Map<string, string> {
   const store = new Map<string, string>();
   vi.stubGlobal('localStorage', {
@@ -47,14 +41,12 @@ describe('settings storage', () => {
   });
 
   it('falls back per field rather than discarding the whole object', () => {
-    // A value this app never writes — a stale build, or a hand edit.
     store.set(
       KEY,
       JSON.stringify({ theme: 'neon', motion: 'static', depth: 'fast', board: 'walnut' }),
     );
     const loaded = loadSettings();
     expect(loaded.theme).toBe(DEFAULT_SETTINGS.theme);
-    // The fields either side of the bad one survive.
     expect(loaded.motion).toBe('static');
     expect(loaded.depth).toBe('fast');
     expect(loaded.board).toBe('walnut');
@@ -71,8 +63,6 @@ describe('settings storage', () => {
   });
 
   it('keeps working when storage itself throws', () => {
-    // Private browsing can make setItem throw; a preference that cannot
-    // be remembered must still be usable for this session.
     vi.stubGlobal('localStorage', {
       getItem: () => { throw new Error('denied'); },
       setItem: () => { throw new Error('denied'); },

@@ -7,7 +7,6 @@ interface SettingsScreenProps {
   onChange: (next: Settings) => void;
 }
 
-/** One row of mutually exclusive choices. */
 function Choice<T extends string>({
   label,
   help,
@@ -25,9 +24,7 @@ function Choice<T extends string>({
     <section className="setting">
       <div className="setting-head">
         <h2 className="setting-label">{label}</h2>
-        {/* Every setting says what it does in plain language. Someone who
-            has never met a chess engine should still be able to tell what
-            changing this will do. */}
+        {}
         <p className="setting-help">{help}</p>
       </div>
       <div className="segmented" role="group" aria-label={label}>
@@ -52,7 +49,6 @@ export default function SettingsScreen({ settings, onChange }: SettingsScreenPro
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) =>
     onChange({ ...settings, [key]: value });
 
-  /** Which pack is downloading, so its row can say so. */
   const [pending, setPending] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -63,9 +59,6 @@ export default function SettingsScreen({ settings, onChange }: SettingsScreenPro
     try {
       await setLanguage(code);
     } catch {
-      // Downloading is the only part of this app that needs a network,
-      // so it is also the only setting that can fail. Say so plainly and
-      // stay on the language that was already working.
       setFailed(true);
     } finally {
       setPending(null);
@@ -125,8 +118,7 @@ export default function SettingsScreen({ settings, onChange }: SettingsScreenPro
                   aria-pressed={value === settings.board}
                   onClick={() => set('board', value)}
                 >
-                  {/* The swatch is the label — two squares in the board's
-                      own colours say more than the name does. */}
+                  {}
                   <span className="swatch-tiles" aria-hidden="true">
                     <span className="swatch-light" />
                     <span className="swatch-dark" />
@@ -155,8 +147,7 @@ export default function SettingsScreen({ settings, onChange }: SettingsScreenPro
                     onClick={() => void pickLanguage(l.code)}
                   >
                     <span className="language-name">{l.label}</span>
-                    {/* Its English name too, so someone who opened this by
-                        accident can find their way back. */}
+                    {}
                     {l.label !== l.english && (
                       <span className="language-english">{l.english}</span>
                     )}

@@ -8,7 +8,7 @@
 # chmod +x" approach fails on any current phone. The one directory Android
 # will execute from is the app's native library directory, and that is
 # populated exclusively from `jniLibs` with files named `lib*.so`. The
-# engine is therefore shipped as `libstockfish.so` — an ordinary ARM
+# engine is therefore shipped as `libstockfish.so`, an ordinary ARM
 # executable wearing a library's name. `resolve_engine_path` in
 # src-tauri/src/lib.rs finds it again at runtime.
 #
@@ -81,7 +81,7 @@ fi
 #
 # Measured on a Galaxy S23: the stub build, given the real networks at
 # runtime through the `EvalFile`/`EvalFileSmall` UCI options, searches
-# *bit-identically* to the build that carries them inside it — 1,364,733
+# *bit-identically* to the build that carries them inside it: 1,364,733
 # nodes on both for `bench 16 1 12`.
 #
 # Set EMBED_NETS=1 for a self-contained 109MB binary that needs no
@@ -113,18 +113,18 @@ for abi in $ABIS; do
   esac
 
   cxx="$toolchain/${triple}${MIN_SDK}-clang++"
-  [ -x "$cxx" ] || die "no compiler at '$cxx' — is MIN_SDK=$MIN_SDK available in this NDK?"
+  [ -x "$cxx" ] || die "no compiler at '$cxx'. Is MIN_SDK=$MIN_SDK available in this NDK?"
 
   printf '\n==> %s (%s)\n' "$abi" "$sf_arch"
   make -C "$src_root/src" clean >/dev/null 2>&1 || true
   # `make all`, not `make build`. The `build` target depends on `net`,
   # which re-downloads the real networks and would silently overwrite the
-  # placeholders — the binary came out at 109MB again the first time.
+  # placeholders. The binary came out at 109MB again the first time.
   if [ "${EMBED_NETS:-0}" = "1" ]; then
     make -C "$src_root/src" net ARCH="$sf_arch" COMP=ndk CXX="$cxx"
   fi
   # 16KB page alignment. Android 15 introduced 16KB-page devices and the
-  # platform refuses to load — or warns loudly about — ELF objects whose
+  # platform refuses to load, or warns loudly about, ELF objects whose
   # LOAD segments assume 4KB. NDK r27 can produce aligned output but does
   # not do it by default; r28 does. Without this the OS shows the user an
   # "app isn't 16 KB-compatible" dialog on launch.

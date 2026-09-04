@@ -1,7 +1,3 @@
-// TEMPORARY harness — mounted only when the dev server is loaded with
-// ?harness=practice. Lets the practice board be driven in a plain browser
-// (no Tauri runtime), which is the only way to verify that pieces can
-// actually be moved. Delete once verified.
 import { useState } from 'react';
 import ChessBoard from './components/ChessBoard';
 import HomeFlow from './components/HomeFlow';
@@ -12,8 +8,6 @@ import type { ReviewSummary } from './lib/storage';
 
 const FEN_BEFORE = '2r3k1/pp3pp1/4p2p/4Pn2/8/P4N2/1P1r1PPP/3R2K1 w - - 0 23';
 
-/// Fake library so the cross-game insights panel can be seen without a
-/// Tauri runtime (storage commands are unavailable in a plain browser).
 const FAKE_RECENT: ReviewSummary[] = [
   ['saqibsiddiq', 'opponent_one', '1-0', 74, 61],
   ['rival_two', 'saqibsiddiq', '1-0', 68, 55],
@@ -40,18 +34,11 @@ const FAKE_RECENT: ReviewSummary[] = [
 }));
 
 export default function PracticeHarness() {
-  // An in-page switch rather than a query param: the preview browser
-  // strips query strings on navigate, so a param-driven view can't be
-  // reached from tooling.
   const [view, setView] = useState<'practice' | 'home'>('practice');
-  // The review screen runs the field in `static` mode; this switch is the
-  // only way to exercise that path outside the Tauri runtime.
   const [fieldMode, setFieldMode] = useState<'live' | 'static'>('live');
   return (
     <>
-      {/* Fixed, so it never steals height from the `.app` shell below —
-          the home view has to be measured against a true 100dvh or any
-          overflow finding is an artifact of this toolbar. */}
+      {}
       <div
         style={{
           position: 'fixed', top: 0, left: 0, zIndex: 9999,
@@ -72,10 +59,7 @@ export default function PracticeHarness() {
             mode={fieldMode}
             theme={document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'}
           />
-          {/* The real shell puts `.home` in the second grid row, under the
-              top bar. Without that row the panel sizes to its content and
-              overflows the viewport unscrollably, which is a property of
-              this harness rather than of the app. */}
+          {}
           <header className="topbar">
             <span className="brand"><span>Chesy</span></span>
           </header>
@@ -93,10 +77,6 @@ function PracticeBoardHarness() {
   const [attempts, setAttempts] = useState<PracticeAttempt[]>([]);
   const [log, setLog] = useState<string[]>([]);
 
-  // Exposed so the browser console can drive real user-moves:
-  // selectSquare -> userMove -> movable.events.after, the same path a
-  // human click takes. Synthetic pointer events can't be used because
-  // Chessground rejects anything with isTrusted === false.
   const onApiReady = (api: unknown) => {
     (window as unknown as Record<string, unknown>).__cg = api;
   };

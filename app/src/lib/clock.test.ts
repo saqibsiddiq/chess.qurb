@@ -28,25 +28,19 @@ describe('parseTimeControl', () => {
 });
 
 describe('timeSpentPerMove', () => {
-  // 1. e4 e5 2. Nf3 Nc6 — four plies, alternating colours.
   const game = parsePgn('1. e4 e5 2. Nf3 Nc6 *');
 
   test('measures each colour against its own previous reading', () => {
-    // White: 180 -> 175 -> 170 (5s each). Black: 180 -> 178 -> 168 (2s, 10s).
     const clocks = [175, 178, 170, 168];
     expect(timeSpentPerMove(game, clocks, 0, 180)).toEqual([5, 2, 5, 10]);
   });
 
   test('adds the increment back so fast moves are not negative', () => {
-    // With a 2s increment a move that took 1s leaves the clock 1s higher
-    // than it started; without adding the increment back that reads as −1.
     const clocks = [181, 181, 182, 182];
     expect(timeSpentPerMove(game, clocks, 2, 180)).toEqual([1, 1, 1, 1]);
   });
 
   test('reports nothing rather than nonsense when time was added', () => {
-    // A jump no increment explains — added time, or a PGN we can't reason
-    // about. A wrong number here would poison every aggregate built on it.
     const clocks = [175, 178, 900, 168];
     const spent = timeSpentPerMove(game, clocks, 0, 180);
     expect(spent[2]).toBeNull();
@@ -54,10 +48,8 @@ describe('timeSpentPerMove', () => {
 
   test('has no baseline for the first move when the time control is unknown', () => {
     const spent = timeSpentPerMove(game, [175, 178, 170, 168], 0, null);
-    // Nothing to measure the opening moves against...
     expect(spent[0]).toBeNull();
     expect(spent[1]).toBeNull();
-    // ...but later moves have each colour's own previous reading.
     expect(spent[2]).toBe(5);
     expect(spent[3]).toBe(10);
   });
@@ -72,7 +64,6 @@ describe('timeInsights', () => {
   const colors: ('w' | 'b')[] = ['w', 'b', 'w', 'b', 'w', 'b'];
 
   test('summarises only the requested side', () => {
-    // White: 10, 2, 30. Black's 99s think must not appear anywhere.
     const spent = [10, 99, 2, 1, 30, 1];
     const classes = ['good', 'good', 'blunder', 'good', 'good', 'good'];
     const ins = timeInsights(spent, classes, colors, 'w')!;
@@ -82,7 +73,6 @@ describe('timeInsights', () => {
   });
 
   test('links rushed moves to the mistakes made on them', () => {
-    // White plays three moves under 5s; two of them are costly.
     const spent = [1, 20, 2, 20, 3, 20];
     const classes = ['blunder', 'good', 'good', 'good', 'mistake', 'good'];
     const ins = timeInsights(spent, classes, colors, 'w')!;
@@ -95,7 +85,6 @@ describe('timeInsights', () => {
     const spent = [5, null, 5, null, 300, null];
     const classes = ['good', 'good', 'good', 'good', 'good', 'good'];
     const ins = timeInsights(spent, classes, colors, 'w')!;
-    // A mean would report over 100 seconds a move.
     expect(ins.medianSeconds).toBe(5);
   });
 

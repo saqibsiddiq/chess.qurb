@@ -30,23 +30,16 @@ export interface GameReview {
 
 const MATE_SCORE = 100_000;
 
-// Chesy approximations of Chess.com's proprietary Expected Points thresholds
-// — see ml/specs/review_contract.md section 9.
 const BOOK_LOSS_CEILING_CP = 100;
 const GREAT_GAP_CP = 150;
 const NONTRIVIAL_WP_LOW = 3;
 const NONTRIVIAL_WP_HIGH = 97;
-const BRILLIANT_MIN_SACRIFICE = 2; // pawn-equivalent units; admits an exchange sac (5-3)
+const BRILLIANT_MIN_SACRIFICE = 2;
 const BRILLIANT_MIN_WP_AFTER = 60;
 
-// Exported so practice mode scores an attempted move with exactly the
-// same arithmetic the review uses — a "you lost 1.4 pawns" in practice
-// must mean the same thing as it does in the review, or the two features
-// quietly disagree about the same position.
 export function toCpValue(cp: number | null, mate: number | null, isWhiteTurn = true): number {
   if (mate !== null) {
     if (mate === 0) {
-      // Terminal checkmate: if it's black's turn and black is mated, White won (+MATE_SCORE)
       return isWhiteTurn ? -MATE_SCORE : MATE_SCORE;
     }
     return mate > 0 ? MATE_SCORE - mate * 10 : -MATE_SCORE - mate * 10;
@@ -54,11 +47,6 @@ export function toCpValue(cp: number | null, mate: number | null, isWhiteTurn = 
   return cp ?? 0;
 }
 
-// Lichess win% formula converting White-relative centipawns to White win
-// probability. Exported so turning-point detection ranks swings on the
-// same scale accuracy is scored with — centipawns alone would rate a
-// 3-pawn slip in an already-lost position as highly as one that threw a
-// level game.
 export function winPercent(cp: number): number {
   return 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
 }
@@ -69,9 +57,6 @@ function moveAccuracy(winPercentBefore: number, winPercentAfter: number): number
   return Math.min(100, Math.max(0, acc));
 }
 
-// A recapture is "obvious" (never Great/Brilliant, per Chess.com's own
-// exclusion) when it lands on the square the opponent just captured on and
-// it's the only legal recapture available there.
 function isObviousRecapture(fenBefore: string, playedUci: string, prevMove: ParsedMove | undefined): boolean {
   if (!prevMove || !prevMove.san.includes('x')) return false;
   const toSquare = playedUci.slice(2, 4);
@@ -116,11 +101,8 @@ function classify(input: ClassifyInput): Classification {
 
   if (isCheckmate) return 'best';
 
-  // A missed forced mate overrides the numeric ladder entirely.
   if (missedTacticMotif === 'missed_mate') return 'miss';
 
-  // A known-theory move never gets a Best/Great/Brilliant badge, even when
-  // it's also the engine's top choice — matches Chess.com's real precedence.
   if (isBook && lossCp < BOOK_LOSS_CEILING_CP) return 'book';
 
   if (playedUci === bestUci) {
@@ -137,7 +119,6 @@ function classify(input: ClassifyInput): Classification {
 
   const wpDrop = Math.max(0, wpBefore - wpAfter);
 
-  // If mover is overwhelmingly winning (>95%) and stays winning (>90%), don't label as blunder
   if (wpBefore > 95 && wpAfter > 90) {
     if (lossCp < 50) return 'excellent';
     return 'good';
@@ -150,8 +131,6 @@ function classify(input: ClassifyInput): Classification {
   else if (wpDrop < 30.0 && lossCp < 320) severity = 'mistake';
   else severity = 'blunder';
 
-  // A mistake/blunder that specifically forfeits a tactical win (rather than
-  // just a generic bad move) is Miss instead.
   if (
     (severity === 'mistake' || severity === 'blunder') &&
     (missedTacticMotif === 'fork' || missedTacticMotif === 'pin' || missedTacticMotif === 'skewer')
@@ -183,13 +162,6 @@ export function finalizeAccuracy(acc: AccuracyAccumulator): { whiteAccuracy: num
   };
 }
 
-/**
- * Classifies a single move. Needs only the two adjacent AnalysisResult
- * slots (before/after) plus the running accuracy accumulator — nothing
- * else in the game depends on move order beyond that, which is what lets
- * the frontend classify moves incrementally as engine analysis streams
- * in, rather than waiting for the whole game.
- */
 export function reviewMove(
   game: ParsedGame,
   index: number,

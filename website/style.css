@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Chesy — design system
+   Chesy design system
    Tokens, type scale, spacing and shape derived from
    Google Antigravity (antigravity.google): light surface,
    Google Sans Flex at weight 450, pill controls, large radii,
@@ -105,7 +105,7 @@ img,svg,canvas{display:block;max-width:100%}
 ::selection{background:var(--on-surface);color:var(--surface)}
 
 /* ── Type utilities ──────────────────────────────────────
-   Antigravity's signature is large type at weight 450 —
+   Antigravity's signature is large type at weight 450,
    never bold. Everything below honours that.            */
 
 .display{
@@ -455,7 +455,7 @@ img,svg,canvas{display:block;max-width:100%}
 /* ── Classification legend ───────────────────────────── */
 
 .legend{
-  /* Ten labels — a fixed column count keeps the last row full
+  /* Ten labels, and a fixed column count keeps the last row full
      instead of leaving orphan cells at wide viewports. */
   display:grid;
   grid-template-columns:repeat(2,1fr);
@@ -603,7 +603,7 @@ img,svg,canvas{display:block;max-width:100%}
   /* The header must NOT filter its backdrop at this width. A non-none
      backdrop-filter makes an element a containing block for fixed-position
      descendants, and the mobile sheet below is a fixed child of the
-     header — so the blur silently collapsed `inset:0` from the viewport
+     header, so the blur silently collapsed `inset:0` from the viewport
      down to the 72px header bar. A solid fill keeps the nav legible over
      the drifting hero pieces without creating that containing block. */
   .site-header{
@@ -612,7 +612,7 @@ img,svg,canvas{display:block;max-width:100%}
     -webkit-backdrop-filter:none;
   }
 
-  /* The sheet covers the viewport, so the brand has to be lifted over it —
+  /* The sheet covers the viewport, so the brand has to be lifted over it,
      otherwise opening the menu blanks the header and leaves a bare ✕. */
   .logo{position:relative;z-index:102}
 

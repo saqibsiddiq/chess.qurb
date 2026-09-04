@@ -1,5 +1,5 @@
 /**
- * Chesy — scroll reveals, sticky header and navigation
+ * Chesy: scroll reveals, sticky header and navigation
  */
 
 (function () {
@@ -49,7 +49,7 @@
   const evalFill = document.getElementById('eval-fill');
 
   if (evalFill && 'IntersectionObserver' in window) {
-    // The mock ends in 16.Qxh7# — mate for White — so the bar has to
+    // The mock ends in 16.Qxh7#, mate for White, so the bar has to
     // resolve toward White, not away from it.
     const stops = ['38%', '34%', '22%', '8%', '2%'];
     let i = 0;

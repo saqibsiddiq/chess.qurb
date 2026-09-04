@@ -6,7 +6,7 @@ type MoveListItem = ParsedMove & { classification?: Classification };
 
 interface MoveListProps {
   moves: MoveListItem[];
-  currentIndex: number; // -1 means the starting position
+  currentIndex: number;
   onSelect: (index: number) => void;
 }
 
@@ -31,9 +31,6 @@ interface TurnRow {
 function MoveList({ moves, currentIndex, onSelect }: MoveListProps) {
   const activeBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // Group moves by turn. Memoised on `moves` alone: navigating between
-  // moves changes `currentIndex` constantly but never the grouping, so
-  // there's no reason to rebuild it on every keypress.
   const turns = useMemo(() => {
     const rows: TurnRow[] = [];
     let currentTurn: TurnRow | null = null;
@@ -63,10 +60,6 @@ function MoveList({ moves, currentIndex, onSelect }: MoveListProps) {
     return rows;
   }, [moves]);
 
-  // Scroll the active move into view. Smooth scrolling is pleasant for a
-  // single click but stacks up badly when arrow keys are held down — each
-  // keypress queues another animation — so it's dropped for anyone who
-  // has asked the system to reduce motion.
   useEffect(() => {
     if (!activeBtnRef.current) return;
     const prefersReducedMotion =
@@ -127,9 +120,4 @@ function MoveList({ moves, currentIndex, onSelect }: MoveListProps) {
   );
 }
 
-// `moves` changes on every review-progress event (a new classification
-// really did arrive), so this can't skip those. It's here to skip the
-// re-renders driven by unrelated state — SLM explanations arriving,
-// arrows/orientation toggles, engine status — which during a review are
-// competing with Stockfish for the same CPU.
 export default memo(MoveList);

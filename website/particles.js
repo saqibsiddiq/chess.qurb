@@ -1,9 +1,9 @@
 /**
- * Chesy — cursor-reactive chess field
+ * Chesy: cursor-reactive chess field
  *
  * A calm, always-visible drift of tiny chess pieces. Moving the cursor
  * through the field pushes the nearest pieces aside, drags them along in
- * its wake, and "colours them in" — each piece eases from a neutral grey
+ * its wake, and "colours them in". Each piece eases from a neutral grey
  * to the accent of a move classification, then settles back once the
  * cursor moves on.
  *
@@ -26,7 +26,7 @@
     /* king   */ 'M11 1.2h2v2.1h2.1v2H13v2.4h-2V5.3H8.9v-2H11zM12 8.4c2.6-2.1 6.6-1.6 7.6 1.3.8 2.3-.6 4.3-2.3 5.6l-1.5 1.1H8.2l-1.5-1.1c-1.7-1.3-3.1-3.3-2.3-5.6C5.4 6.8 9.4 6.3 12 8.4zM4.6 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H4.6a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z',
   ].map((d) => new Path2D(d));
 
-  /* Move-classification accents — the colour a piece warms to. */
+  /* Move-classification accents: the colour a piece warms to. */
   const ACCENTS = [
     [33, 191, 164],   // brilliant
     [50, 121, 249],   // great

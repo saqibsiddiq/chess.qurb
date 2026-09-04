@@ -1,41 +1,3 @@
-// Phrasing variety for explainMove()/detectMissedTactic() in
-// explanations.ts. The underlying facts (which piece, which square,
-// which move) already differ every time; what was repetitive was the
-// fixed sentence *shape* wrapped around them — the same move type
-// always read as the exact same template. Below, most branches compose
-// their summary from two independently-picked, independently-written
-// clauses (an "opener" naming what happened, a "consequence" explaining
-// why it matters) rather than one fixed sentence — that turns a modest
-// number of hand-written fragments into a much larger number of
-// combinations (10 openers x 10 consequences = 100 distinct summaries
-// from 20 fragments) without the fragments themselves degrading into
-// synonym-swaps of each other, which is what happens past ~15-20 fully
-// independent hand-written sentences for the same slot. Both clauses
-// are always written as complete, independently-grammatical sentences
-// (not a fragment expecting a specific connector) so any opener can
-// combine safely with any consequence.
-//
-// Selection is deterministic per move (seeded from the move's own
-// identity, not Math.random()) so the same move shows the same wording
-// on every view within a session — only different moves get different
-// phrasing, not the same move flickering between wordings on re-render.
-
-// Murmur3-style finalizer, applied after FNV-1a below. Needed for a
-// concrete reason, not just extra rigor: many seeds here share a long
-// common prefix (e.g. "w12:e2e4:hanging:opener" vs
-// "w12:e2e4:hanging:consequence", differing only in the tag suffix).
-// Plain FNV-1a's left-to-right multiplicative mixing means running the
-// *same* long shared prefix through the *same* recurrence leaves the two
-// resulting hashes correlated with each other, even though each one
-// individually looks well-distributed in isolation — verified directly
-// (300 sampled seed pairs landed on only 36 of 144 possible index
-// combinations for two "independent" picks, versus the ~126 expected if
-// they were actually independent). This finalizer's avalanche (every
-// input bit flips roughly half the output bits) breaks that
-// correlation — confirmed the same way, landing at 128/144 after adding
-// it. Skipping this and picking two indices straight from FNV-1a on
-// seeds sharing a prefix will silently reintroduce clustering, even
-// though it looks fine if you only test one pool at a time.
 function mix32(x: number): number {
   x ^= x >>> 16;
   x = Math.imul(x, 0x85ebca6b);
@@ -46,8 +8,6 @@ function mix32(x: number): number {
 }
 
 function hashSeed(seed: string): number {
-  // FNV-1a — small, fast, good-enough as the first pass; see mix32()
-  // above for why its raw output isn't used directly.
   let hash = 2166136261;
   for (let i = 0; i < seed.length; i++) {
     hash ^= seed.charCodeAt(i);
@@ -60,9 +20,6 @@ export function pickVariant<T>(seed: string, variants: readonly T[]): T {
   return variants[hashSeed(seed) % variants.length];
 }
 
-// ---------------------------------------------------------------------
-// Checkmate
-// ---------------------------------------------------------------------
 export const checkmateSummaries: readonly ((san: string) => string)[] = [
   (san) => `${san} delivers checkmate. Game over.`,
   (san) => `${san} seals it. Checkmate.`,
@@ -90,9 +47,6 @@ export const checkmateDetails: readonly string[] = [
   'A decisive way to end it.',
 ];
 
-// ---------------------------------------------------------------------
-// Missed mate
-// ---------------------------------------------------------------------
 export const missedMateSummaries: readonly ((bestSan: string) => string)[] = [
   (bestSan) => `${bestSan} would have forced checkmate here.`,
   (bestSan) => `There was a forced mate available with ${bestSan}.`,
@@ -125,9 +79,6 @@ export const missedMateDetails: readonly ((san: string) => string)[] = [
   (san) => `That's a missed finish. ${san} doesn't end it.`,
 ];
 
-// ---------------------------------------------------------------------
-// Allowed mate
-// ---------------------------------------------------------------------
 export const allowedMateSummaries: readonly ((san: string) => string)[] = [
   (san) => `${san} walks into a forced checkmate, and there's no way out now.`,
   (san) => `${san} allows a forced mate, so the game is effectively over.`,
@@ -153,10 +104,6 @@ export const allowedMateDetails: readonly ((bestSan: string) => string)[] = [
   (bestSan) => `${bestSan} was the move that held everything together.`,
 ];
 
-// ---------------------------------------------------------------------
-// Hanging piece — compositional: opener (what's exposed) x consequence
-// (who's taking it). 12 x 12 = 144 summary combinations.
-// ---------------------------------------------------------------------
 export interface HangingOpenerArgs {
   pieceName: string;
   square: string;
@@ -219,9 +166,6 @@ export const hangingDetails: readonly ((a: { bestSan: string; lossText: string }
   (a) => `${a.bestSan} was the tidier, safer option. (~${a.lossText} pawns lost)`,
 ];
 
-// ---------------------------------------------------------------------
-// Missed fork — compositional: attack description x consequence.
-// ---------------------------------------------------------------------
 export const forkOpeners: readonly ((a: { bestSan: string; targetNames: string }) => string)[] = [
   (a) => `${a.bestSan} attacks ${a.targetNames} at once.`,
   (a) => `${a.bestSan} forks ${a.targetNames}.`,
@@ -262,9 +206,6 @@ export const forkDetails: readonly ((san: string) => string)[] = [
   (san) => `${san} sidesteps the fork entirely.`,
 ];
 
-// ---------------------------------------------------------------------
-// Missed pin — compositional.
-// ---------------------------------------------------------------------
 export const pinOpeners: readonly ((a: { bestSan: string; frontPiece: string }) => string)[] = [
   (a) => `${a.bestSan} pins the ${a.frontPiece}.`,
   (a) => `${a.bestSan} ties the ${a.frontPiece} down.`,
@@ -302,9 +243,6 @@ export const pinDetails: readonly ((a: { san: string; frontPiece: string }) => s
   (a) => `${a.san} doesn't create that same pressure.`,
 ];
 
-// ---------------------------------------------------------------------
-// Missed skewer — compositional.
-// ---------------------------------------------------------------------
 export const skewerOpeners: readonly ((a: { bestSan: string; frontPiece: string; behindPiece: string }) => string)[] = [
   (a) => `${a.bestSan} skewers the ${a.frontPiece}.`,
   (a) => `${a.bestSan} lines up the ${a.frontPiece} and the ${a.behindPiece}.`,
@@ -336,9 +274,6 @@ export const skewerDetails: readonly ((san: string) => string)[] = [
   (san) => `${san} lets both pieces stay connected safely.`,
 ];
 
-// ---------------------------------------------------------------------
-// Discovered attack — compositional.
-// ---------------------------------------------------------------------
 export const discoveredOpeners: readonly ((san: string) => string)[] = [
   (san) => `${san} opens a line.`,
   (san) => `${san} uncovers a hidden attack.`,
@@ -378,9 +313,6 @@ export const discoveredDetails: readonly string[] = [
   'This is a fresh threat, not one that was already there.',
 ];
 
-// ---------------------------------------------------------------------
-// Back rank — compositional.
-// ---------------------------------------------------------------------
 export const backRankOpeners: readonly ((kingSquare: string) => string)[] = [
   (k) => `Your king on ${k} is boxed in along the back rank.`,
   (k) => `The king on ${k} has no escape squares on the back rank.`,
@@ -408,9 +340,6 @@ export const backRankDetails: readonly ((san: string) => string)[] = [
   (san) => `${san} left the king's escape squares just as blocked.`,
 ];
 
-// ---------------------------------------------------------------------
-// Positive: brilliant / great / book / best / solid
-// ---------------------------------------------------------------------
 export const brilliantSummaries: readonly ((san: string) => string)[] = [
   (san) => `${san} is a sound sacrifice that's hard to find.`,
   (san) => `${san} gives up material, and it's completely sound.`,
@@ -518,12 +447,6 @@ export const solidDetails: readonly ((a: { san: string; bestSan: string }) => st
   (a) => `${a.bestSan} was marginally better, but this is a fine choice too.`,
 ];
 
-// ---------------------------------------------------------------------
-// Generic positional loss (the fallback when no specific tactic/motif
-// matched). severityWord() in explanations.ts already contributes one
-// axis of variation (mistake/blunder/miss/slip); these pools add a
-// second, independent axis on top of it.
-// ---------------------------------------------------------------------
 export const fallbackSummaries: readonly ((a: { san: string; severity: string }) => string)[] = [
   (a) => `${a.san} isn't a tactical blunder, just ${a.severity} that loosens your position.`,
   (a) => `${a.san} is ${a.severity}, without any single tactic behind it.`,

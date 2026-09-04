@@ -9,7 +9,7 @@
 # were both wrong here before this script existed:
 #
 #   * An adaptive icon's foreground is a 108dp canvas of which launchers
-#     only ever show the central 72dp — the outer ring is reserved for
+#     only ever show the central 72dp. The outer ring is reserved for
 #     masking and parallax. A mark scaled against the full canvas
 #     therefore appears roughly 1.5x larger than intended and can touch
 #     or cross the mask edge. The crown is sized against the *visible*
