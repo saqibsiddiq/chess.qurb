@@ -11,7 +11,7 @@
     },
     {
       "name": "stockfish-net-small",
-      "version": "sf18-37f18f62d772-probe",
+      "version": "sf18-37f18f62d772",
       "file": "nn-37f18f62d772.nnue",
       "url": "https://github.com/saqibsiddiq/chess.qurb/releases/download/assets-v1/nn-37f18f62d772.nnue",
       "sha256": "37f18f62d772f3107e1d6aaca3898c130c3c86f2ab63e6555fbbca20635a899d",
