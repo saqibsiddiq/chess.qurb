@@ -22,7 +22,14 @@ use tokio::io::AsyncWriteExt;
 /// Where the manifest lives. Assets themselves may be hosted anywhere the
 /// manifest points; the large networks cannot live in the repository at
 /// all, since they are over the 100MB per-file limit.
-const MANIFEST_URL: &str = "https://chess.qurb.cloud/assets/manifest.json";
+///
+/// The Pages address rather than the chess.qurb.cloud custom domain,
+/// which has no DNS record yet: every request to it failed to resolve, so
+/// the app fell back to its bundled manifest on every launch and could
+/// never have learned about a newer network. Pointing at the origin
+/// GitHub serves keeps working once that domain is set up, because Pages
+/// then redirects here to it and redirects are followed.
+const MANIFEST_URL: &str = "https://saqibsiddiq.github.io/chess.qurb/assets/manifest.json";
 
 /// One downloadable file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
