@@ -984,7 +984,7 @@ function App() {
                     className={`chip-btn ${reviewMode === 'fast' ? 'is-active' : ''}`}
                     onClick={() => setReviewMode('fast')}
                     disabled={reviewing}
-                    title="Depth 10, single line — faster, no Great/Brilliant detection. Best for weaker hardware."
+                    title="Depth 10, single line. Faster, but no Great/Brilliant detection. Best for weaker hardware."
                   >
                     Fast
                   </button>
@@ -993,7 +993,7 @@ function App() {
                     className={`chip-btn ${reviewMode === 'deep' ? 'is-active' : ''}`}
                     onClick={() => setReviewMode('deep')}
                     disabled={reviewing}
-                    title="Depth 14, two lines — full classification including Great/Brilliant. Slower."
+                    title="Depth 14, two lines. Full classification including Great/Brilliant, but slower."
                   >
                     Deep
                   </button>
@@ -1267,7 +1267,7 @@ function App() {
                         ? `${timeSpent[currentIndex]!.toFixed(1)}s`
                         : `${Math.round(timeSpent[currentIndex]!)}s`}
                     </strong>
-                    {timeSpent[currentIndex]! < RUSHED_SECONDS && ' — played almost instantly.'}
+                    {timeSpent[currentIndex]! < RUSHED_SECONDS && ', played almost instantly.'}
                   </p>
                 )}
             </ReviewOverlay>

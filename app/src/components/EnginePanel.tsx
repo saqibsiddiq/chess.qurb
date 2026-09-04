@@ -66,7 +66,7 @@ const CLASSIFICATION_LABELS: Record<Classification, string> = {
 
 function formatEval(evalCp: number | null, evalMate: number | null): string {
   if (evalMate !== null) return `M${Math.abs(evalMate)}`;
-  if (evalCp === null) return '—';
+  if (evalCp === null) return '–';
   const pawns = (evalCp / 100).toFixed(2);
   return evalCp > 0 ? `+${pawns}` : pawns;
 }
@@ -90,7 +90,7 @@ function EnginePanel({
   const motifLabel = explanation?.motif ? MOTIF_LABELS[explanation.motif] : undefined;
 
   const bestSan = useMemo(() => {
-    return analysis && analysis.bestMove ? uciToSan(fen, analysis.bestMove) : '—';
+    return analysis && analysis.bestMove ? uciToSan(fen, analysis.bestMove) : '–';
   }, [fen, analysis?.bestMove]);
 
   // Newest attempt only — see the comment on the practice block below.
@@ -229,14 +229,14 @@ function EnginePanel({
               <p className="insight-summary">
                 {last.reason ?? (last.verdict === 'best'
                   ? 'That is the move the engine plays here.'
-                  : 'A reasonable try — the engine still prefers its own move.')}
+                  : 'A reasonable try, though the engine still prefers its own move.')}
               </p>
             </>
           ) : (
             <>
               <div className="insight-title">Play the move you think is best</div>
               <p className="insight-summary">
-                {practice.status === 'judging' ? 'Checking…' : 'The board is live — drag a piece.'}
+                {practice.status === 'judging' ? 'Checking…' : 'The board is live. Drag a piece.'}
               </p>
             </>
           )}
@@ -296,7 +296,7 @@ function EnginePanel({
       {expanded && (
         <>
           <div className="insight-meta">
-            <span>Depth {analysis?.depth ?? '—'}</span>
+            <span>Depth {analysis?.depth ?? '–'}</span>
             <span>Best <strong>{bestSan}</strong></span>
           </div>
           {pvSan && <div className="insight-pv" title={pvSan}>{pvSan}</div>}

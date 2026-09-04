@@ -583,7 +583,7 @@ export function describeThreat(fenAfter: string): string | null {
 
   const backRank = detectBackRank(board, defender);
   if (backRank) {
-    return `Your king on ${backRank.kingSquare} is short of escape squares — watch the back rank.`;
+    return `Your king on ${backRank.kingSquare} is short of escape squares, so watch the back rank.`;
   }
 
   return null;

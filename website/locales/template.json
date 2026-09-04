@@ -49,7 +49,7 @@
   "settings.appearance.light": "Light",
   "settings.appearance.dark": "Dark",
   "settings.background": "Background",
-  "settings.background.help": "The chess pieces behind the app drift and react to your touch. Turn that off if you would rather they stayed still — it also makes the app a little lighter on the battery.",
+  "settings.background.help": "The chess pieces behind the app drift and react to your touch. Turn that off if you would rather they stayed still. It also makes the app a little lighter on the battery.",
   "settings.background.moving": "Moving",
   "settings.background.still": "Still",
   "settings.depth": "Review depth",

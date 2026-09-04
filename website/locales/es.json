@@ -49,7 +49,7 @@
   "settings.appearance.light": "Claro",
   "settings.appearance.dark": "Oscuro",
   "settings.background": "Fondo",
-  "settings.background.help": "Las piezas del fondo se mueven y reaccionan a tu toque. Desactívalo si prefieres que se queden quietas — también gasta algo menos de batería.",
+  "settings.background.help": "Las piezas del fondo se mueven y reaccionan a tu toque. Desactívalo si prefieres que se queden quietas. También gasta algo menos de batería.",
   "settings.background.moving": "En movimiento",
   "settings.background.still": "Quieto",
   "settings.depth": "Profundidad del análisis",

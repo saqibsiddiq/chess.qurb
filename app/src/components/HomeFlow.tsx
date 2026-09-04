@@ -647,7 +647,7 @@ export default function HomeFlow({ onImport, recent, onOpenRecent, onNav }: Home
                     <>
                       {' '}You usually follow known theory until about move{' '}
                       <strong>{Math.max(1, Math.round(record.averageBookExit / 2))}</strong>, then
-                      start playing your own moves. That is the point worth studying next — it is
+                      start playing your own moves. That is the point worth studying next, because it is
                       where preparation stops helping you.
                     </>
                   )}

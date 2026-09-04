@@ -265,7 +265,7 @@ impl EngineSession {
                     )
                 } else {
                     format!(
-                        "Couldn't start Stockfish at '{exe}' — is it installed and accessible? ({e})"
+                        "Couldn't start Stockfish at '{exe}'. Is it installed and accessible? ({e})"
                     )
                 }
             })?;

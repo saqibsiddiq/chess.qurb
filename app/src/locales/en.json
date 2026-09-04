@@ -49,7 +49,7 @@
   "settings.appearance.light": "Light",
   "settings.appearance.dark": "Dark",
   "settings.background": "Background",
-  "settings.background.help": "The chess pieces behind the app drift and react to your touch. Turn that off if you would rather they stayed still — it also makes the app a little lighter on the battery.",
+  "settings.background.help": "The chess pieces behind the app drift and react to your touch. Turn that off if you would rather they stayed still. It also makes the app a little lighter on the battery.",
   "settings.background.moving": "Moving",
   "settings.background.still": "Still",
   "settings.depth": "Review depth",
@@ -90,9 +90,9 @@
   "local.scanOnlyDesktop": "File scanning is only available in the desktop app.",
   "local.noFiles": "No PGN files found in Downloads, Documents or Desktop.",
   "assets.title": "One quick download",
-  "assets.lede": "Chesy needs the chess engine's brain before it can review a game — {size}, downloaded once and kept on your device. Everything after this happens offline.",
+  "assets.lede": "Chesy needs the chess engine's brain before it can review a game. That is {size}, downloaded once and kept on your device. Everything after this happens offline.",
   "assets.download": "Download now ({size})",
-  "assets.downloading": "Getting {name} — {percent}%",
-  "assets.failed": "That download didn't finish. Check your connection and try again — nothing was lost, it will pick up from the start.",
+  "assets.downloading": "Getting {name} ({percent}%)",
+  "assets.failed": "That download didn't finish. Check your connection and try again. Nothing was lost, and it will pick up from the start.",
   "assets.note": "Best done on Wi-Fi. Your games are never uploaded anywhere."
 }

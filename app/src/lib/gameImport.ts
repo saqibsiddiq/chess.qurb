@@ -99,7 +99,7 @@ export async function fetchLichessGames(username: string, max = DEFAULT_MAX_GAME
   }
 
   if (res.status === 404) throw new GameImportError(`No Lichess account found for "${trimmed}".`);
-  if (res.status === 429) throw new GameImportError('Lichess is rate-limiting requests right now — wait a moment and try again.');
+  if (res.status === 429) throw new GameImportError('Lichess is rate-limiting requests right now. Wait a moment and try again.');
   if (!res.ok) throw new GameImportError(`Lichess request failed (${res.status}).`);
 
   const text = await res.text();
