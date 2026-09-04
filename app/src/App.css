@@ -700,6 +700,17 @@ ul{list-style:none}
    light frame of slate, classic, ocean and walnut alike. */
 .board-container.cg-wrap coords{
   z-index:4;font-family:var(--mono);font-size:10px;letter-spacing:0;font-weight:600;
+}
+/* Every label the same ink, set on the labels themselves.
+   Chessground's theme alternates them — half dark, half
+   `rgba(255,255,255,.8)` — because it assumes they sit on alternating
+   board squares. Out in the margin they all sit on the light frame, so
+   the white half simply vanished: a, c, e, g and 2, 4, 6, 8. A colour on
+   the container cannot fix that, since an inherited value loses to any
+   declaration on the element itself; these selectors have to outrank
+   chessground's own `.orientation-white .files :nth-child(odd)`. */
+.board-container.cg-wrap coords.files coord,
+.board-container.cg-wrap coords.ranks coord{
   color:rgba(18,20,26,.66);
 }
 /* Files below the board, each label centred under its own file. The row
