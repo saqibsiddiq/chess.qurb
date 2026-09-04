@@ -84,10 +84,7 @@ export function useAssets(): AssetsView {
       // so an empty list is the truthful answer and keeps the dev server
       // usable.
       console.warn('Could not read asset status:', cause);
-      setAssets([
-        { name: 'stockfish-net-big', version: 'x', bytes: 108919594, required: true, installed: false, outdated: false },
-        { name: 'stockfish-net-small', version: 'x', bytes: 3519630, required: true, installed: false, outdated: false },
-      ]);
+      setAssets([]);
     }
   }, []);
 

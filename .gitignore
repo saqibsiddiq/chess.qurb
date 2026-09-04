@@ -60,3 +60,7 @@ data/experiments/generated/
 
 # Local Python environments
 dataset/venv/
+
+# Stockfish's Android cross-compile scratch: an unpacked source tree plus
+# the NNUE nets, ~220MB. Recreated by scripts/build-stockfish-android.sh.
+.stockfish-android/
