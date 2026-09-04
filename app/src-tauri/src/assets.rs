@@ -13,6 +13,7 @@
 //! is what lets the app ship at a tenth of its previous size.
 
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tauri::{Emitter, Manager};
@@ -82,6 +83,45 @@ pub struct DownloadProgress {
     pub total: u64,
 }
 
+/// The HTTPS client, built once and shared.
+///
+/// The trust roots are Mozilla's, compiled into the binary, rather than
+/// the platform's. reqwest's rustls backend otherwise defaults to
+/// `rustls-platform-verifier`, which on Android has to be handed a JNI
+/// environment during startup or it panics on the first request:
+///
+///     thread 'tokio-rt-worker' panicked at rustls-platform-verifier:
+///     Expect rustls-platform-verifier to be initialized
+///
+/// The panic killed the task without returning, so the download sat at
+/// 0% forever instead of reporting an error. Tauri gives no convenient
+/// hook for that initialisation, and bundled roots keep the TLS setup
+/// identical on desktop and Android. The cost is that a new root
+/// authority needs an app update, which for fetching our own published
+/// assets is a fair trade.
+fn https() -> Result<&'static reqwest::Client, String> {
+    static CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            let mut roots = rustls::RootCertStore::empty();
+            roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+            // Named explicitly rather than via the process-wide default,
+            // which is not installed anywhere in this app.
+            let provider = std::sync::Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+            let config = rustls::ClientConfig::builder_with_provider(provider)
+                .with_safe_default_protocol_versions()
+                .map_err(|e| format!("Could not set up TLS: {e}"))?
+                .with_root_certificates(roots)
+                .with_no_client_auth();
+            reqwest::Client::builder()
+                .use_preconfigured_tls(config)
+                .build()
+                .map_err(|e| format!("Could not set up the network client: {e}"))
+        })
+        .as_ref()
+        .map_err(|e| e.clone())
+}
+
 fn asset_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
@@ -120,7 +160,10 @@ fn builtin_manifest() -> Manifest {
 /// the bundled copy. A failed fetch is not an error — it just means the
 /// app works from what it shipped knowing.
 async fn current_manifest() -> Manifest {
-    match reqwest::get(MANIFEST_URL).await {
+    // A client that cannot even be built is not an error here: the
+    // bundled manifest is the honest answer, same as an unreachable host.
+    let Ok(client) = https() else { return builtin_manifest() };
+    match client.get(MANIFEST_URL).send().await {
         Ok(response) if response.status().is_success() => match response.json::<Manifest>().await {
             Ok(manifest) => manifest,
             Err(_) => builtin_manifest(),
@@ -189,7 +232,9 @@ pub async fn download_asset(app: tauri::AppHandle, name: String) -> Result<(), S
         .find(|a| a.name == name)
         .ok_or_else(|| format!("No asset called '{name}'"))?;
 
-    let response = reqwest::get(&spec.url)
+    let response = https()?
+        .get(&spec.url)
+        .send()
         .await
         .map_err(|e| format!("Could not reach {}: {e}", spec.url))?;
     if !response.status().is_success() {
@@ -282,6 +327,15 @@ mod tests {
         write_installed(&dir, &state).unwrap();
         assert_eq!(read_installed(&dir).versions.get("a").map(String::as_str), Some("1"));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn the_https_client_builds() {
+        // Guards the TLS setup: a bad crypto provider or protocol-version
+        // combination only shows up when the client is constructed, and
+        // the failure that motivated bundling roots at all was a runtime
+        // panic on the very first request rather than a build error.
+        assert!(https().is_ok(), "{:?}", https().err());
     }
 
     #[test]

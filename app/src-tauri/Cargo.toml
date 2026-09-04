@@ -56,6 +56,10 @@ encoding_rs = "0.8.35"
 # OpenSSL to link against, and bundling one for a handful of downloads
 # is not worth it.
 reqwest = { version = "0.13.4", default-features = false, features = ["stream", "rustls", "http2", "json"] }
+# TLS trust roots compiled in rather than read from the platform; see
+# the `https` client in src/assets.rs for why.
+rustls = { version = "0.23.43", default-features = false, features = ["aws-lc-rs", "std", "tls12"] }
+webpki-roots = "1"
 futures-util = "0.3.34"
 sha2 = "0.10.9"
 hex = "0.4.3"
