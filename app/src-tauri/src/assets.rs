@@ -169,13 +169,40 @@ fn builtin_manifest() -> Manifest {
 async fn current_manifest() -> Manifest {
     // A client that cannot even be built is not an error here: the
     // bundled manifest is the honest answer, same as an unreachable host.
-    let Ok(client) = https() else { return builtin_manifest() };
+    // Every fallback says why. This path is silent by design -- working
+    // from the bundled copy is correct when the network is unavailable --
+    // but silence also hid a manifest that was being fetched and then
+    // discarded, which looked identical from outside to one that was
+    // never fetched at all.
+    let client = match https() {
+        Ok(client) => client,
+        Err(e) => {
+            eprintln!("chesy: no HTTP client, using bundled manifest: {e}");
+            return builtin_manifest();
+        }
+    };
     match client.get(MANIFEST_URL).send().await {
-        Ok(response) if response.status().is_success() => match response.json::<Manifest>().await {
-            Ok(manifest) => manifest,
-            Err(_) => builtin_manifest(),
+        Ok(response) if response.status().is_success() => match response.text().await {
+            Ok(body) => match serde_json::from_str::<Manifest>(&body) {
+                Ok(manifest) => manifest,
+                Err(e) => {
+                    eprintln!("chesy: published manifest did not parse ({e}); body starts: {:.120}", body);
+                    builtin_manifest()
+                }
+            },
+            Err(e) => {
+                eprintln!("chesy: could not read the published manifest: {e}");
+                builtin_manifest()
+            }
         },
-        _ => builtin_manifest(),
+        Ok(response) => {
+            eprintln!("chesy: manifest fetch returned {}", response.status());
+            builtin_manifest()
+        }
+        Err(e) => {
+            eprintln!("chesy: manifest fetch failed: {e}");
+            builtin_manifest()
+        }
     }
 }
 
