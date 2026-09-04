@@ -18,8 +18,14 @@ import en from '../locales/en.json';
 export type CatalogueValue = string | string[];
 export type Catalogue = Record<string, CatalogueValue>;
 
-/** Where downloadable packs are published — the project's own Pages site. */
-const PACK_BASE = 'https://chess.qurb.cloud/locales';
+/** Where downloadable packs are published: the project's own Pages site.
+ *
+ *  The github.io origin rather than the chess.qurb.cloud custom domain,
+ *  which has no DNS record yet, so every pack download failed to resolve
+ *  and each language other than English reported itself unavailable. This
+ *  keeps working if that domain is set up later, since Pages then
+ *  redirects here to it. */
+const PACK_BASE = 'https://saqibsiddiq.github.io/chess.qurb/locales';
 const CACHE_PREFIX = 'chesy.locale.';
 const CHOICE_KEY = 'chesy.language';
 
