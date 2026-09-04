@@ -83,7 +83,8 @@ Stockfish's two NNUE networks are 107 MB of a 109 MB engine binary. Built
 without them the engine is 1.3 MB, and given the networks at runtime
 through the `EvalFile` and `EvalFileSmall` UCI options it searches
 *identically*: `bench 16 1 12` returns 1,364,733 nodes either way, node for
-node. That is what lets the Android package be about 9 MB rather than 116.
+node. That is what lets the Android package be about 9 MB rather than 116,
+and the desktop one drop by the same 110 MB.
 
 The networks are published as release assets and described by a manifest
 the app fetches on launch, so a newer network can reach an installed app
@@ -120,12 +121,14 @@ cd app/src-tauri && cargo test --lib   # backend, 24 tests
 ### Desktop
 
 ```bash
-cd app
-npm run tauri build
+bash scripts/build-stockfish-desktop.sh     # engine, ~900KB, stub networks
+cd app && npm run tauri build
 ```
 
-The app looks for a bundled engine at `binaries/stockfish` and falls back
-to `stockfish` on `$PATH`. See
+The engine is bundled into the package as a resource and found again at
+runtime, with `stockfish` on `$PATH` as the fallback. Like the Android
+build it leaves the networks out and fetches them on first launch; set
+`EMBED_NETS=1` to bundle them instead. See
 [`app/src-tauri/binaries/README.md`](app/src-tauri/binaries/README.md).
 
 ### Android
