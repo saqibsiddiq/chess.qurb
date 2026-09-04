@@ -2,5 +2,6 @@
   "default": "app-icon.png",
   "android_bg": "bg.png",
   "android_fg": "fg.png",
-  "android_fg_scale": 62
+  "android_fg_scale": 46,
+  "default_scale": 64
 }

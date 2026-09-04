@@ -112,6 +112,7 @@
   --fs-xs:      11px; --lh-xs:      15px; --ls-xs:      .07em;
 
   /* ── Shape ───────────────────────────────────────────── */
+  --board-gutter:14px;
   --r-xs:4px; --r-sm:7px; --r-md:11px; --r-lg:15px; --r-xl:20px; --r-pill:9999px;
 
   /* ── Elevation ───────────────────────────────────────────
@@ -661,6 +662,11 @@ ul{list-style:none}
   border-radius:var(--r-md);
   overflow:hidden;
   background:var(--board-light);
+  /* The playable board is inset by the gutter the coordinates live in.
+     `border-box` keeps this element exactly --board-px square, so the
+     measurement `BoardStage` feeds back stays the size it always was. */
+  box-sizing:border-box;
+  padding:var(--board-gutter);
   box-shadow:0 0 0 1px rgba(18,19,23,.08),0 2px 6px rgba(18,19,23,.06),0 14px 40px rgba(18,19,23,.09);
 }
 
@@ -680,38 +686,44 @@ ul{list-style:none}
   background-size:25% 25%;
 }
 
-/* Coordinates take their colour from the square they sit on, which is
-   what chessground's `coord-light`/`coord-dark` classes are for. The
-   previous rule painted every one of them the same light grey, so the
-   half sitting on light squares were invisible — which read as missing
-   or wrong letters rather than as unreadable ones.
+/* Coordinates sit in a margin around the board, not on the squares.
+   On the squares they landed underneath the back-rank pieces — the
+   letters ran straight through the rooks and knights — and no amount of
+   colour tuning fixes text and a piece occupying the same pixels.
 
-   Black and white at low alpha rather than theme tokens, because the
-   board palette is a separate user choice: these have to stay legible on
-   slate, classic, ocean and walnut alike. */
+   The margin is uniform on all four sides so the board stays centred and
+   the frame reads as deliberate; only the left and bottom carry labels.
+   It costs about 4% of the board's width.
+
+   The ink is black at low alpha rather than a theme token, because the
+   board palette is a separate user choice: it has to stay legible on the
+   light frame of slate, classic, ocean and walnut alike. */
 .board-container.cg-wrap coords{
   z-index:4;font-family:var(--mono);font-size:10px;letter-spacing:0;font-weight:600;
+  color:rgba(18,20,26,.66);
 }
-/* The last file used to sit past the board's right edge, where the
-   square's `overflow:hidden` cut it in half. */
-.board-container.cg-wrap coords.files coord:last-child{padding-right:2px}
-/* Dark ink on *both* shades. The usual light-on-dark trick assumes dark
-   squares are actually dark; these palettes are light-to-mid, and white
-   at 78% measured only 2.68:1 on slate's darker square. Near-black gives
-   14.6:1 on the light square and 6:1 or better on the darker one for
-   slate, classic and ocean. */
-.board-container.cg-wrap coords coord.coord-light{color:rgba(18,20,26,.72)}
-.board-container.cg-wrap coords coord.coord-dark{color:rgba(18,20,26,.82)}
-/* Walnut is the one palette dark enough to invert: its brown square
-   drops below 4.5:1 against dark ink, and clears 5.5:1 against white. */
-:root[data-board="walnut"] .board-container.cg-wrap coords coord.coord-dark{
-  color:rgba(255,255,255,.88);
+/* Files below the board, each label centred under its own file. The row
+   fills the gutter exactly so the letters sit optically centred in it
+   rather than crowding either edge. */
+.board-container.cg-wrap coords.files{
+  top:auto;bottom:calc(var(--board-gutter) * -1);
+  left:0;width:100%;height:var(--board-gutter);
+  display:flex;align-items:center;
 }
-.board-container.cg-wrap coords.ranks{left:3px}
-/* Pinned to the board's own left edge: chessground was offsetting this
-   row 24px to the right, which pushed the last file past the square and
-   `overflow:hidden` cut it in half. */
-.board-container.cg-wrap coords.files{bottom:1px;left:0;width:100%}
+/* Ranks to the left, the row spanning the board's full height so each
+   number lines up with the centre of its own rank. */
+.board-container.cg-wrap coords.ranks{
+  left:calc(var(--board-gutter) * -1);
+  top:0;bottom:0;height:auto;width:var(--board-gutter);
+  display:flex;flex-direction:column-reverse;
+}
+.board-container.cg-wrap coords.ranks coord{
+  flex:1 1 0;display:flex;align-items:center;justify-content:center;
+  /* Chessground translates each rank label down by about 16px to sit it
+     in a square's upper corner. With the labels out in the margin that
+     shift just misaligns every number against its own rank. */
+  transform:none;
+}
 
 /* ── Eval rail ──────────────────────────────────────────── */
 

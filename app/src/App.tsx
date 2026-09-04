@@ -13,7 +13,6 @@ import { useAssets } from './lib/assets';
 import EnginePanel from './components/EnginePanel';
 import GameGraph from './components/GameGraph.tsx';
 import {
-  ChesyMark,
   IconBack,
   IconFlip,
   IconTarget,
@@ -806,9 +805,11 @@ function App() {
             the first screen's alone; every other screen gets a back
             button in that corner instead, so the way out is always in the
             same place. */}
+        {/* At home, the wordmark only. The crown sat opposite the
+            settings icon and earned nothing on a screen the user has
+            already chosen to open; the name alone says where they are. */}
         {atHome ? (
           <span className="brand">
-            <ChesyMark className="brand-mark" />
             <span>Chesy</span>
           </span>
         ) : (
