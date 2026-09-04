@@ -90,21 +90,47 @@ function GameGraph({ moves, totalMoves, currentIndex, onSelect }: GameGraphProps
     [step, moves.length],
   );
 
+  /** Where a touch started, so a release can tell a tap from a swipe. */
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  /** A finger that moved less than this was pointing, not scrolling. */
+  const TAP_SLOP = 10;
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
-      const index = indexFromEvent(e.clientX);
-      if (index === null) return;
-      // Capture so a drag keeps scrubbing even if the finger leaves the
-      // graph vertically, which is easy to do on a 90px-tall element.
-      e.currentTarget.setPointerCapture(e.pointerId);
-      onSelect(index);
+      // A mouse cannot pan the chart, so dragging with one still scrubs —
+      // that is the nicer desktop behaviour and conflicts with nothing.
+      if (e.pointerType === 'mouse') {
+        const index = indexFromEvent(e.clientX);
+        if (index === null) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        onSelect(index);
+        return;
+      }
+      // A finger, though, is the only way to scroll a chart that is wider
+      // than the screen. Selecting on press — and claiming the pointer —
+      // meant every attempt to scroll a long game scrubbed it instead.
+      // The selection now waits for the release to prove it was a tap.
+      touchStart.current = { x: e.clientX, y: e.clientY };
     },
     [indexFromEvent, onSelect],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent<SVGRectElement>) => {
+      if (e.pointerType !== 'mouse') return;
       if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+      const index = indexFromEvent(e.clientX);
+      if (index !== null) onSelect(index);
+    },
+    [indexFromEvent, onSelect],
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent<SVGRectElement>) => {
+      const start = touchStart.current;
+      touchStart.current = null;
+      if (e.pointerType === 'mouse' || !start) return;
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_SLOP) return;
       const index = indexFromEvent(e.clientX);
       if (index !== null) onSelect(index);
     },
@@ -191,6 +217,8 @@ function GameGraph({ moves, totalMoves, currentIndex, onSelect }: GameGraphProps
         height={HEIGHT}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => { touchStart.current = null; }}
       />
     </svg>
   );

@@ -35,7 +35,17 @@ export const IconUpload = (p: P) => (
 );
 
 export const ChesyMark = (p: P) => (
-  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M11 1.2h2v2.1h2.1v2H13v2.4h-2V5.3H8.9v-2H11zM12 8.4c2.6-2.1 6.6-1.6 7.6 1.3.8 2.3-.6 4.3-2.3 5.6l-1.5 1.1H8.2l-1.5-1.1c-1.7-1.3-3.1-3.3-2.3-5.6C5.4 6.8 9.4 6.3 12 8.4zM4.6 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H4.6a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z"/></svg>
+  /* A king, drawn as three solid shapes so it still reads as a king at
+     24px — the size it is actually used at. Proportions were taken from
+     a CC0 chess set on Wikimedia Commons (Chess pieces, Qwertyxp2000,
+     public domain, no attribution required); that artwork is far too
+     detailed to use directly at this size, so this is a redraw rather
+     than a copy, and carries no licence obligations either way. */
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}>
+    <path d="M12.9 1.6a.95.95 0 0 0-1.9 0v1.2H9.7a.95.95 0 0 0 0 1.9H11v1.6a.95.95 0 0 0 1.9 0V4.7h1.4a.95.95 0 0 0 0-1.9h-1.4V1.6z" />
+    <path d="M12 7.4c-1.7-1.4-4-1.6-5.6-.6-2 1.2-2.6 3.7-1.4 5.7.6 1 1.4 1.9 2.3 2.6l.9.7h7.6l.9-.7c.9-.7 1.7-1.6 2.3-2.6 1.2-2 .6-4.5-1.4-5.7-1.6-1-3.9-.8-5.6.6z" />
+    <path d="M5.4 17.6h13.2a1.5 1.5 0 0 1 1.5 1.5v1.4a1.5 1.5 0 0 1-1.5 1.5H5.4a1.5 1.5 0 0 1-1.5-1.5v-1.4a1.5 1.5 0 0 1 1.5-1.5z" />
+  </svg>
 );
 
 export const IconGlobe = (p: P) => (
@@ -67,4 +77,36 @@ export const IconSun = (p: P) => (
 
 export const IconMoon = (p: P) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M12.7 2.1a1 1 0 0 1 .3 1.2 7.4 7.4 0 0 0 9.4 9.9 1 1 0 0 1 1.3 1.3A10 10 0 1 1 11.5 1.8a1 1 0 0 1 1.2.3zM10 4.1a8 8 0 1 0 10.5 10.4A9.4 9.4 0 0 1 10 4.1z"/></svg>
+);
+
+export const IconClose = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M6.2 4.8a1 1 0 0 0-1.4 1.4l5.8 5.8-5.8 5.8a1 1 0 1 0 1.4 1.4l5.8-5.8 5.8 5.8a1 1 0 0 0 1.4-1.4L13.4 12l5.8-5.8a1 1 0 0 0-1.4-1.4L12 10.6z"/></svg>
+);
+
+export const IconChart = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M3.3 15.3a1 1 0 0 1 .1-1.4l5.2-4.5a1 1 0 0 1 1.2-.1l3.6 2.3 5-4.9a1 1 0 1 1 1.4 1.4l-5.6 5.5a1 1 0 0 1-1.2.1L9.4 11.5l-4.7 4a1 1 0 0 1-1.4-.2zM4 18h16a1 1 0 1 1 0 2H4a1 1 0 1 1 0-2z"/></svg>
+);
+
+export const IconClock = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M12 2.6a9.4 9.4 0 1 0 0 18.8 9.4 9.4 0 0 0 0-18.8zm0 2a7.4 7.4 0 1 1 0 14.8 7.4 7.4 0 0 1 0-14.8zM12 6.5a1 1 0 0 1 1 1v4.1l2.8 1.6a1 1 0 1 1-1 1.8l-3.3-1.9a1 1 0 0 1-.5-.9V7.5a1 1 0 0 1 1-1z"/></svg>
+);
+
+export const IconChevronDown = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M4.7 8.7a1 1 0 0 1 1.4 0L12 14.6l5.9-5.9a1 1 0 1 1 1.4 1.4l-6.6 6.6a1 1 0 0 1-1.4 0L4.7 10.1a1 1 0 0 1 0-1.4z"/></svg>
+);
+
+export const IconSettings = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M4 6.2h6.2a2.9 2.9 0 0 1 5.6 0H20a1 1 0 1 1 0 2h-4.2a2.9 2.9 0 0 1-5.6 0H4a1 1 0 0 1 0-2zm9 1a1.9 1.9 0 1 0-3.8 0 1.9 1.9 0 0 0 3.8 0zM4 15.8h2.2a2.9 2.9 0 0 1 5.6 0H20a1 1 0 1 1 0 2h-8.2a2.9 2.9 0 0 1-5.6 0H4a1 1 0 1 1 0-2zm6.9 1a1.9 1.9 0 1 0-3.8 0 1.9 1.9 0 0 0 3.8 0z"/></svg>
+);
+
+/* Marks for the two services, drawn here rather than shipped as brand
+   assets: a knight for Lichess and a pawn for Chess.com, each in that
+   service's colour. They are recognisable stand-ins used to identify the
+   site you are connecting to, not copies of the official logos. */
+export const IconLichess = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M9.4 17.4c0-2.6 1-4 2.6-5.3 1.3-1 2-1.7 2-2.5 0-.5-.3-.9-.8-.9-.6 0-1 .4-1.6 1.2l-1.2 1.6-2.1-1.3 1.9-4.1C11.4 3.4 13.3 2 15.6 2c2.6 0 4.1 2 4.4 5 .3 3.2.2 7-.1 10.4zM5 18.6h14.8a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H5a1.1 1.1 0 0 1-1.1-1.1v-1.6A1.1 1.1 0 0 1 5 18.6z"/></svg>
+);
+
+export const IconChessCom = (p: P) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...p}><path d="M12 2.6a3.3 3.3 0 0 1 1.9 6l.3 1.2h1.1c.2 2.6 1.1 5 2.5 7.1H6.2c1.4-2.1 2.3-4.5 2.5-7.1h1.1l.3-1.2a3.3 3.3 0 0 1 1.9-6zM5.2 18.6h13.6a1.1 1.1 0 0 1 1.1 1.1v1.6a1.1 1.1 0 0 1-1.1 1.1H5.2a1.1 1.1 0 0 1-1.1-1.1v-1.6a1.1 1.1 0 0 1 1.1-1.1z"/></svg>
 );

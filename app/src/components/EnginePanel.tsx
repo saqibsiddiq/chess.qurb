@@ -1,9 +1,11 @@
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import type { AnalysisResult } from '../lib/analysis.ts';
-import type { Classification } from '../lib/reviewEngine.ts';
+import { toCpValue, winPercent, type Classification } from '../lib/reviewEngine.ts';
 import type { MoveExplanation, TacticalMotif } from '../lib/explanations';
-import { pvToSan, uciToSan } from '../lib/explanations';
+import { describeThreat, pvToSan, uciToSan } from '../lib/explanations';
 import type { SlmState } from '../lib/slm.ts';
+import { IconChevronRight } from './icons';
+import { useT } from '../lib/i18n';
 import { VERDICT_COPY, type PracticeAttempt } from '../lib/practice';
 
 /** The live drill, when one is running. */
@@ -64,7 +66,7 @@ const CLASSIFICATION_LABELS: Record<Classification, string> = {
 
 function formatEval(evalCp: number | null, evalMate: number | null): string {
   if (evalMate !== null) return `M${Math.abs(evalMate)}`;
-  if (evalCp === null) return '—';
+  if (evalCp === null) return '–';
   const pawns = (evalCp / 100).toFixed(2);
   return evalCp > 0 ? `+${pawns}` : pawns;
 }
@@ -88,13 +90,32 @@ function EnginePanel({
   const motifLabel = explanation?.motif ? MOTIF_LABELS[explanation.motif] : undefined;
 
   const bestSan = useMemo(() => {
-    return analysis && analysis.bestMove ? uciToSan(fen, analysis.bestMove) : '—';
+    return analysis && analysis.bestMove ? uciToSan(fen, analysis.bestMove) : '–';
   }, [fen, analysis?.bestMove]);
 
   // Newest attempt only — see the comment on the practice block below.
   const last = practice && practice.attempts.length > 0
     ? practice.attempts[practice.attempts.length - 1]
     : null;
+
+  const winChance = useMemo(() => {
+    if (!analysis) return null;
+    if (analysis.evalCp === null && analysis.evalMate === null) return null;
+    return Math.round(winPercent(toCpValue(analysis.evalCp, analysis.evalMate)));
+  }, [analysis?.evalCp, analysis?.evalMate]);
+
+  // What is now coming at the player, as opposed to what their own move
+  // did. Only shown when there is something concrete to name.
+  const threat = useMemo(() => describeThreat(fen), [fen]);
+
+  /** Collapsed shows the verdict and one sentence; everything else is a
+   *  tap away. The board is the thing that should own the screen, and
+   *  this panel was taking a third of it to restate the same move in six
+   *  registers. Resets on every move so stepping never inherits an
+   *  expanded box from the move before. */
+  const tr = useT();
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => { setExpanded(false); }, [fen]);
 
   const pvSan = useMemo(() => {
     return analysis && analysis.pv.length > 0 ? pvToSan(fen, analysis.pv.slice(0, 8)).join(' ') : '';
@@ -107,6 +128,13 @@ function EnginePanel({
           {loading && !analysis
             ? `Analysing${progressPercent !== null ? ` · ${progressPercent}%` : '…'}`
             : formatEval(analysis?.evalCp ?? null, analysis?.evalMate ?? null)}
+          {/* "+1.40" means little below about 1500. The win probability
+              says the same thing in a unit anyone can act on, and it also
+              explains why the same slip matters less from a winning
+              position than from a level one. */}
+          {!loading && analysis && winChance !== null && (
+            <span className="insight-odds">{winChance}% for White</span>
+          )}
         </div>
 
         {(classification || motifLabel) && (
@@ -123,19 +151,58 @@ function EnginePanel({
 
       {explanation && !practice && (
         <div className="insight-block insight-body" key={explanation.title + explanation.summary}>
-          <div className="insight-kicker">
-            <span>Why this matters</span>
-            {canPractice && onStartPractice ? (
+          {/* "Why this matters" was a label that never said anything the
+              sentence under it did not. The practice action stays, because
+              it is the one thing here you can act on. */}
+          {canPractice && onStartPractice && (
+            <div className="insight-kicker">
               <button type="button" className="kicker-action" onClick={onStartPractice}>
-                Try it yourself
+                {tr('review.tryIt')}
               </button>
-            ) : (
-              explanation.shapes.length > 0 && <span>Arrows on board</span>
-            )}
-          </div>
+            </div>
+          )}
           <div className="insight-title">{explanation.title}</div>
           <p className="insight-summary">{explanation.summary}</p>
-          <p className="insight-detail">{explanation.detail}</p>
+
+          {expanded && (
+            <>
+              <p className="insight-detail">{explanation.detail}</p>
+              {threat && <p className="insight-threat">{threat}</p>}
+              {/* Built from the arrows actually on the board, so it never
+                  explains a colour that is not there. Four colours with
+                  fixed meanings are learnable; an unexplained fan of
+                  arrows is not. */}
+              {explanation.shapes.length > 0 && (
+                <ul className="arrow-key">
+                  {(
+                    [
+                      ['blue', tr('arrows.you')],
+                      ['green', tr('arrows.best')],
+                      ['yellow', tr('arrows.threat')],
+                      ['red', tr('arrows.danger')],
+                    ] as const
+                  )
+                    .filter(([brush]) => explanation.shapes.some((s) => s.brush === brush))
+                    .map(([brush, label]) => (
+                      <li key={brush}>
+                        <span className={`arrow-dot is-${brush}`} />
+                        {label}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </>
+          )}
+
+          <button
+            type="button"
+            className="insight-more"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? tr('review.less') : tr('review.more')}
+            <IconChevronRight className={expanded ? 'is-open' : undefined} />
+          </button>
         </div>
       )}
 
@@ -162,14 +229,14 @@ function EnginePanel({
               <p className="insight-summary">
                 {last.reason ?? (last.verdict === 'best'
                   ? 'That is the move the engine plays here.'
-                  : 'A reasonable try — the engine still prefers its own move.')}
+                  : 'A reasonable try, though the engine still prefers its own move.')}
               </p>
             </>
           ) : (
             <>
               <div className="insight-title">Play the move you think is best</div>
               <p className="insight-summary">
-                {practice.status === 'judging' ? 'Checking…' : 'The board is live — drag a piece.'}
+                {practice.status === 'judging' ? 'Checking…' : 'The board is live. Drag a piece.'}
               </p>
             </>
           )}
@@ -191,7 +258,10 @@ function EnginePanel({
         </div>
       )}
 
-      {onRequestDeepDive && !slmState && (
+      {/* Everything from here down is detail: the depth the engine
+          reached, the line it wants, and the on-demand model. Useful when
+          you go looking, noise on every single move. */}
+      {expanded && onRequestDeepDive && !slmState && (
         <button type="button" className="deep-dive-btn" onClick={onRequestDeepDive}>
           Explain in depth (experimental)
         </button>
@@ -223,11 +293,15 @@ function EnginePanel({
         </div>
       )}
 
-      <div className="insight-meta">
-        <span>Depth {analysis?.depth ?? '—'}</span>
-        <span>Best <strong>{bestSan}</strong></span>
-      </div>
-      {pvSan && <div className="insight-pv" title={pvSan}>{pvSan}</div>}
+      {expanded && (
+        <>
+          <div className="insight-meta">
+            <span>Depth {analysis?.depth ?? '–'}</span>
+            <span>Best <strong>{bestSan}</strong></span>
+          </div>
+          {pvSan && <div className="insight-pv" title={pvSan}>{pvSan}</div>}
+        </>
+      )}
     </div>
   );
 }

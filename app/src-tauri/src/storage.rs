@@ -61,6 +61,17 @@ pub struct ReviewSummary {
     pub white_motifs: HashMap<String, u32>,
     #[serde(default)]
     pub black_motifs: HashMap<String, u32>,
+    /// Opening identity and where the game left known theory. Optional
+    /// so summaries written before this existed still deserialize.
+    #[serde(default)]
+    pub opening: Option<String>,
+    #[serde(default)]
+    pub eco: Option<String>,
+    #[serde(default)]
+    pub book_exit_ply: Option<usize>,
+    /// How the game ended — a different axis from how it was played.
+    #[serde(default)]
+    pub termination: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

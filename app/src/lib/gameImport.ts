@@ -1,6 +1,12 @@
+import type { LichessAnalysisEntry } from './lichessAnalysis';
+
 export type RemoteProvider = 'lichess' | 'chesscom';
 
 export interface RemoteGameSummary {
+  /** Lichess's own per-ply analysis, when the game has been analysed
+   *  there. Its presence lets a review render with no local engine work
+   *  at all — see lichessAnalysis.ts. */
+  analysis?: LichessAnalysisEntry[];
   id: string;
   white: string;
   black: string;
@@ -13,6 +19,11 @@ export interface RemoteGameSummary {
 }
 
 class GameImportError extends Error {}
+
+/// How many games a Connect fetch pulls. Chess.com serves whole months at
+/// a time, so a larger number usually costs no extra requests; Lichess
+/// streams, so it is one response either way.
+export const DEFAULT_MAX_GAMES = 100;
 
 // No fetch here had a timeout, so a stalled request on a flaky mobile
 // connection left the Connect panel spinning forever with no way out.
@@ -58,6 +69,7 @@ interface LichessGame {
   status?: string;
   players?: { white?: LichessPlayer; black?: LichessPlayer };
   pgn?: string;
+  analysis?: LichessAnalysisEntry[];
 }
 
 function lichessPlayerName(player: LichessPlayer | undefined): string {
@@ -74,11 +86,11 @@ function lichessResult(game: LichessGame): string {
   return '*';
 }
 
-export async function fetchLichessGames(username: string, max = 20): Promise<RemoteGameSummary[]> {
+export async function fetchLichessGames(username: string, max = DEFAULT_MAX_GAMES): Promise<RemoteGameSummary[]> {
   const trimmed = username.trim();
   if (!trimmed) throw new GameImportError('Enter a Lichess username.');
 
-  const url = `https://lichess.org/api/games/user/${encodeURIComponent(trimmed)}?max=${max}&pgnInJson=true&opening=false`;
+  const url = `https://lichess.org/api/games/user/${encodeURIComponent(trimmed)}?max=${max}&pgnInJson=true&opening=true&evals=true`;
   let res: Response;
   try {
     res = await fetchWithTimeout(url, { headers: { Accept: 'application/x-ndjson' } });
@@ -87,7 +99,7 @@ export async function fetchLichessGames(username: string, max = 20): Promise<Rem
   }
 
   if (res.status === 404) throw new GameImportError(`No Lichess account found for "${trimmed}".`);
-  if (res.status === 429) throw new GameImportError('Lichess is rate-limiting requests right now — wait a moment and try again.');
+  if (res.status === 429) throw new GameImportError('Lichess is rate-limiting requests right now. Wait a moment and try again.');
   if (!res.ok) throw new GameImportError(`Lichess request failed (${res.status}).`);
 
   const text = await res.text();
@@ -106,6 +118,7 @@ export async function fetchLichessGames(username: string, max = 20): Promise<Rem
       date: formatDate(g.createdAt),
       timeControl: g.speed ?? null,
       pgn: g.pgn ?? '',
+      analysis: g.analysis,
     };
   });
 }
@@ -132,7 +145,7 @@ function chessComResult(game: ChessComGame): string {
   return '1/2-1/2';
 }
 
-export async function fetchChessComGames(username: string, max = 20): Promise<RemoteGameSummary[]> {
+export async function fetchChessComGames(username: string, max = DEFAULT_MAX_GAMES): Promise<RemoteGameSummary[]> {
   const trimmed = username.trim();
   if (!trimmed) throw new GameImportError('Enter a Chess.com username.');
   const handle = encodeURIComponent(trimmed.toLowerCase());

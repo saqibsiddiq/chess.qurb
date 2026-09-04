@@ -64,18 +64,18 @@ export function pickVariant<T>(seed: string, variants: readonly T[]): T {
 // Checkmate
 // ---------------------------------------------------------------------
 export const checkmateSummaries: readonly ((san: string) => string)[] = [
-  (san) => `${san} delivers checkmate — game over.`,
-  (san) => `${san} seals it — checkmate.`,
+  (san) => `${san} delivers checkmate. Game over.`,
+  (san) => `${san} seals it. Checkmate.`,
   (san) => `That's mate. ${san} finishes the game right here.`,
   (san) => `${san} is checkmate. Nothing more to play.`,
-  (san) => `Game over — ${san} is checkmate.`,
+  (san) => `Game over. ${san} is checkmate.`,
   (san) => `${san} ends it in style. Checkmate.`,
-  (san) => `${san} wraps up the game — checkmate.`,
+  (san) => `${san} wraps up the game with checkmate.`,
   (san) => `Checkmate! ${san} finishes it.`,
-  (san) => `${san} is the final blow — checkmate.`,
-  (san) => `That's the game — ${san} is mate.`,
+  (san) => `${san} is the final blow. Checkmate.`,
+  (san) => `That's the game. ${san} is mate.`,
   (san) => `${san} closes it out with checkmate.`,
-  (san) => `Nowhere left to go — ${san} is mate.`,
+  (san) => `Nowhere left to go. ${san} is mate.`,
 ];
 export const checkmateDetails: readonly string[] = [
   'A clean, decisive finish.',
@@ -85,8 +85,8 @@ export const checkmateDetails: readonly string[] = [
   'Well played to the finish.',
   'That’s the game, start to finish.',
   'A tidy way to close things out.',
-  'Nothing left to say — that’s mate.',
-  'The board falls silent — checkmate.',
+  'Nothing left to say. That’s mate.',
+  'The board falls silent. Checkmate.',
   'A decisive way to end it.',
 ];
 
@@ -96,22 +96,22 @@ export const checkmateDetails: readonly string[] = [
 export const missedMateSummaries: readonly ((bestSan: string) => string)[] = [
   (bestSan) => `${bestSan} would have forced checkmate here.`,
   (bestSan) => `There was a forced mate available with ${bestSan}.`,
-  (bestSan) => `${bestSan} finishes the game on the spot — a forced mate.`,
+  (bestSan) => `${bestSan} finishes the game on the spot with a forced mate.`,
   (bestSan) => `You had mate in hand with ${bestSan}.`,
   (bestSan) => `${bestSan} was a forced checkmate, missed here.`,
   (bestSan) => `${bestSan} ends the game immediately with checkmate.`,
   (bestSan) => `A forced mate was sitting right there: ${bestSan}.`,
-  (bestSan) => `${bestSan} was mate — no way for the opponent to survive.`,
+  (bestSan) => `${bestSan} was mate, with no way for the opponent to survive.`,
   (bestSan) => `The game was over with ${bestSan}.`,
   (bestSan) => `${bestSan} delivers a forced checkmate.`,
-  (bestSan) => `That was a missed mate — ${bestSan} finishes it.`,
+  (bestSan) => `That was a missed mate. ${bestSan} finishes it.`,
   (bestSan) => `${bestSan} was the mating blow.`,
   (bestSan) => `Checkmate was available: ${bestSan}.`,
   (bestSan) => `${bestSan} wraps up the game with forced mate.`,
-  (bestSan) => `You could have ended it with ${bestSan} — forced mate.`,
+  (bestSan) => `You could have ended it with ${bestSan}, a forced mate.`,
 ];
 export const missedMateDetails: readonly ((san: string) => string)[] = [
-  (san) => `${san} lets the opponent escape — that winning line is gone now.`,
+  (san) => `${san} lets the opponent escape, and that winning line is gone now.`,
   (san) => `Instead, ${san} gives the opponent a way out.`,
   (san) => `${san} was played instead, and the mating chance is gone.`,
   (san) => `That escape route wasn't there before ${san}.`,
@@ -122,25 +122,25 @@ export const missedMateDetails: readonly ((san: string) => string)[] = [
   (san) => `${san} gives the opponent one more chance.`,
   (san) => `The mating chance disappears with ${san}.`,
   (san) => `${san} was chosen instead of the mating line.`,
-  (san) => `That's a missed finish — ${san} doesn't end it.`,
+  (san) => `That's a missed finish. ${san} doesn't end it.`,
 ];
 
 // ---------------------------------------------------------------------
 // Allowed mate
 // ---------------------------------------------------------------------
 export const allowedMateSummaries: readonly ((san: string) => string)[] = [
-  (san) => `${san} walks into a forced checkmate — there's no way out now.`,
-  (san) => `${san} allows a forced mate — the game is effectively over.`,
+  (san) => `${san} walks into a forced checkmate, and there's no way out now.`,
+  (san) => `${san} allows a forced mate, so the game is effectively over.`,
   (san) => `There's no defense left after ${san}; it's a forced mate.`,
   (san) => `${san} opens the door to a forced checkmate sequence.`,
   (san) => `${san} runs straight into a mating net.`,
   (san) => `After ${san}, there's no way to stop the mate.`,
   (san) => `${san} lets the opponent force checkmate.`,
-  (san) => `That's game over — ${san} allows a forced mate.`,
+  (san) => `That's game over. ${san} allows a forced mate.`,
   (san) => `${san} walks right into a forced finish.`,
   (san) => `The mate is unstoppable after ${san}.`,
   (san) => `${san} hands the opponent a forced checkmate.`,
-  (san) => `There's no escaping it after ${san} — mate is coming.`,
+  (san) => `There's no escaping it after ${san}. Mate is coming.`,
 ];
 export const allowedMateDetails: readonly ((bestSan: string) => string)[] = [
   (bestSan) => `${bestSan} would have kept you safe.`,
@@ -231,7 +231,7 @@ export const forkOpeners: readonly ((a: { bestSan: string; targetNames: string }
   (a) => `There's a fork here: ${a.bestSan} attacks ${a.targetNames} together.`,
   (a) => `${a.bestSan} lines up ${a.targetNames} in one shot.`,
   (a) => `${a.bestSan} threatens ${a.targetNames} at the same time.`,
-  (a) => `A fork was available — ${a.bestSan} goes after ${a.targetNames}.`,
+  (a) => `A fork was available. ${a.bestSan} goes after ${a.targetNames}.`,
   (a) => `${a.bestSan} puts ${a.targetNames} both in danger at once.`,
 ];
 export const forkConsequences: readonly string[] = [
@@ -247,7 +247,7 @@ export const forkConsequences: readonly string[] = [
 export const forkDetails: readonly ((san: string) => string)[] = [
   (san) => `${san} was played instead, so both pieces stay safe.`,
   (san) => `Instead, ${san} lets both targets stay out of danger.`,
-  (san) => `${san} misses the fork — nothing is won this time.`,
+  (san) => `${san} misses the fork, so nothing is won this time.`,
   (san) => `${san} was chosen instead, and the fork never happens.`,
   (san) => `Playing ${san} means both pieces stay protected.`,
   (san) => `${san} doesn't create that same double threat.`,
@@ -256,7 +256,7 @@ export const forkDetails: readonly ((san: string) => string)[] = [
   (san) => `That fork isn't there after ${san}.`,
   (san) => `${san} was played, and the double attack never happens.`,
   (san) => `Both pieces survive after ${san}.`,
-  (san) => `${san} keeps things quieter — no fork follows.`,
+  (san) => `${san} keeps things quieter, and no fork follows.`,
   (san) => `The fork disappears once ${san} is played.`,
   (san) => `Instead of the fork, ${san} was chosen.`,
   (san) => `${san} sidesteps the fork entirely.`,
@@ -281,7 +281,7 @@ export const pinConsequences: readonly ((behindPiece: string) => string)[] = [
   (b) => `It can't move without exposing the ${b} behind it.`,
   (b) => `Moving it would lose the ${b}.`,
   (b) => `The ${b} behind it would fall if it moves.`,
-  (b) => `It's stuck — the ${b} behind it is worth more.`,
+  (b) => `It's stuck, because the ${b} behind it is worth more.`,
   (b) => `Any move loses the ${b} standing behind it.`,
   (b) => `It has to stay put, or the ${b} behind it goes.`,
   (b) => `The ${b} behind it is the real target.`,
@@ -290,7 +290,7 @@ export const pinConsequences: readonly ((behindPiece: string) => string)[] = [
 export const pinDetails: readonly ((a: { san: string; frontPiece: string }) => string)[] = [
   (a) => `${a.san} was played instead, so the ${a.frontPiece} stays free to move.`,
   (a) => `Instead, the ${a.frontPiece} keeps its full mobility after ${a.san}.`,
-  (a) => `${a.san} misses this — the ${a.frontPiece} isn't pinned down.`,
+  (a) => `${a.san} misses this, so the ${a.frontPiece} isn't pinned down.`,
   (a) => `${a.san} was chosen instead, and no pin follows.`,
   (a) => `The ${a.frontPiece} stays loose after ${a.san}.`,
   (a) => `With ${a.san}, that pin never happens.`,
@@ -312,7 +312,7 @@ export const skewerOpeners: readonly ((a: { bestSan: string; frontPiece: string;
   (a) => `${a.bestSan} sets up a skewer on the ${a.frontPiece}.`,
   (a) => `${a.bestSan} attacks the ${a.frontPiece}, with the ${a.behindPiece} lined up behind it.`,
   (a) => `There's a skewer here: ${a.bestSan} hits the ${a.frontPiece} first.`,
-  (a) => `${a.bestSan} forces the ${a.frontPiece} to choose — move, or lose the ${a.behindPiece}.`,
+  (a) => `${a.bestSan} forces the ${a.frontPiece} to choose: move, or lose the ${a.behindPiece}.`,
   (a) => `${a.bestSan} threatens the ${a.frontPiece} and whatever's behind it.`,
 ];
 export const skewerConsequences: readonly ((behindPiece: string) => string)[] = [
@@ -332,7 +332,7 @@ export const skewerDetails: readonly ((san: string) => string)[] = [
   (san) => `${san} sidesteps the skewer entirely.`,
   (san) => `That skewer disappears once ${san} is played.`,
   (san) => `Instead of the skewer, ${san} was chosen.`,
-  (san) => `${san} keeps things quieter — no skewer follows.`,
+  (san) => `${san} keeps things quieter, and no skewer follows.`,
   (san) => `${san} lets both pieces stay connected safely.`,
 ];
 
@@ -361,7 +361,7 @@ export const discoveredConsequences: readonly ((a: DiscoveredConsequenceArgs) =>
   (a) => `The ${a.attackerName} on ${a.attackerSquare} has a clear line to your ${a.targetPiece} on ${a.targetSquare} now.`,
   (a) => `Your ${a.targetPiece} on ${a.targetSquare} is now in the ${a.attackerName}'s sights, from ${a.attackerSquare}.`,
   (a) => `The ${a.attackerName} on ${a.attackerSquare} targets your ${a.targetPiece} on ${a.targetSquare} directly.`,
-  (a) => `That ${a.attackerName} on ${a.attackerSquare} wasn't a threat before — now it hits your ${a.targetPiece} on ${a.targetSquare}.`,
+  (a) => `That ${a.attackerName} on ${a.attackerSquare} wasn't a threat before. Now it hits your ${a.targetPiece} on ${a.targetSquare}.`,
   (a) => `Your ${a.targetPiece} on ${a.targetSquare} is caught in the open by the ${a.attackerName} on ${a.attackerSquare}.`,
   (a) => `The ${a.attackerName} on ${a.attackerSquare} joins the attack against your ${a.targetPiece} on ${a.targetSquare}.`,
 ];
@@ -413,20 +413,20 @@ export const backRankDetails: readonly ((san: string) => string)[] = [
 // ---------------------------------------------------------------------
 export const brilliantSummaries: readonly ((san: string) => string)[] = [
   (san) => `${san} is a sound sacrifice that's hard to find.`,
-  (san) => `${san} gives up material — and it's completely sound.`,
+  (san) => `${san} gives up material, and it's completely sound.`,
   (san) => `That's a brilliant idea: ${san} sacrifices material for a real edge.`,
   (san) => `${san} looks risky, but it's backed up perfectly.`,
   (san) => `${san} trades material for a winning attack.`,
   (san) => `That's a genuinely hard sacrifice to spot: ${san}.`,
-  (san) => `${san} gives up material — and it works.`,
-  (san) => `Few players find ${san} — a real sacrifice with real backing.`,
+  (san) => `${san} gives up material, and it works.`,
+  (san) => `Few players find ${san}, a real sacrifice with real backing.`,
   (san) => `${san} is a calculated risk that pays off.`,
   (san) => `That's brilliant: ${san} sacrifices for a bigger idea.`,
 ];
 export const brilliantDetails: readonly string[] = [
-  'Giving up material here actually strengthens your position — sharp thinking.',
+  'Giving up material here actually strengthens your position. Sharp thinking.',
   'The sacrifice pays off; your position is stronger for it.',
-  "Most players wouldn't find this — well spotted.",
+  "Most players wouldn't find this. Well spotted.",
   "That's the kind of move engines love and humans miss.",
   'The material comes back with interest.',
   "That's a genuinely creative idea.",
@@ -437,12 +437,12 @@ export const brilliantDetails: readonly string[] = [
 export const greatSummaries: readonly ((san: string) => string)[] = [
   (san) => `${san} was the only move that kept the position together.`,
   (san) => `${san} was the one move that held everything together here.`,
-  (san) => `Nothing else worked — ${san} was forced, and you found it.`,
+  (san) => `Nothing else worked. ${san} was forced, and you found it.`,
   (san) => `${san} was the single best option in a tough spot.`,
-  (san) => `Every other try here falls apart — ${san} doesn't.`,
+  (san) => `Every other try here falls apart. ${san} doesn't.`,
   (san) => `${san} was the only real move on the board.`,
   (san) => `The position demanded ${san}, and nothing else.`,
-  (san) => `${san} was forced — and it was the right call.`,
+  (san) => `${san} was forced, and it was the right call.`,
 ];
 export const greatDetails: readonly string[] = [
   'Every other reasonable try here gives up real ground.',
@@ -458,11 +458,11 @@ export const greatDetails: readonly string[] = [
 export const bookSummaries: readonly ((san: string) => string)[] = [
   (san) => `${san} follows known opening theory.`,
   (san) => `${san} is a well-established opening move here.`,
-  (san) => `That's standard theory — ${san} is a known continuation.`,
+  (san) => `That's standard theory. ${san} is a known continuation.`,
   (san) => `${san} is straight out of the opening books.`,
-  (san) => `That's a well-trodden path — ${san}.`,
+  (san) => `${san} is a well-trodden path.`,
   (san) => `${san} sticks to known theory here.`,
-  (san) => `Nothing surprising — ${san} is textbook opening play.`,
+  (san) => `Nothing surprising. ${san} is textbook opening play.`,
   (san) => `${san} follows a well-known line.`,
 ];
 export const bookDetails: readonly string[] = [
@@ -471,7 +471,7 @@ export const bookDetails: readonly string[] = [
   'Solid, well-tested theory.',
   'A reliable choice at this stage.',
   'Plenty of strong players have played this exact line.',
-  'Nothing risky here — just sound theory.',
+  'Nothing risky here, just sound theory.',
   'A dependable way to start the game.',
   'Well-tested, and for good reason.',
 ];
@@ -500,11 +500,11 @@ export const bestDetails: readonly string[] = [
 export const solidSummaries: readonly ((san: string) => string)[] = [
   (san) => `${san} keeps your position balanced and active.`,
   (san) => `${san} holds the position together nicely.`,
-  (san) => `That's a solid choice — ${san} keeps things steady.`,
+  (san) => `That's a solid choice. ${san} keeps things steady.`,
   (san) => `${san} maintains a healthy position.`,
   (san) => `${san} is a perfectly reasonable choice here.`,
   (san) => `${san} keeps everything in good shape.`,
-  (san) => `That's sound play — ${san} keeps the position stable.`,
+  (san) => `That's sound play. ${san} keeps the position stable.`,
   (san) => `${san} is a safe, solid choice.`,
 ];
 export const solidDetails: readonly ((a: { san: string; bestSan: string }) => string)[] = [
@@ -525,21 +525,21 @@ export const solidDetails: readonly ((a: { san: string; bestSan: string }) => st
 // second, independent axis on top of it.
 // ---------------------------------------------------------------------
 export const fallbackSummaries: readonly ((a: { san: string; severity: string }) => string)[] = [
-  (a) => `${a.san} isn't a tactical blunder — just ${a.severity} that loosens your position.`,
+  (a) => `${a.san} isn't a tactical blunder, just ${a.severity} that loosens your position.`,
   (a) => `${a.san} is ${a.severity}, without any single tactic behind it.`,
-  (a) => `There's no tactic here — just ${a.severity} that costs some ground.`,
+  (a) => `There's no tactic here, just ${a.severity} that costs some ground.`,
   (a) => `${a.san} gives up a bit of ground; ${a.severity}, but no outright tactic.`,
-  (a) => `That's ${a.severity} — a gradual slip, not a tactical mistake.`,
-  (a) => `${a.san} loosens things up a little — ${a.severity}, nothing tactical.`,
+  (a) => `That's ${a.severity}, a gradual slip rather than a tactical mistake.`,
+  (a) => `${a.san} loosens things up a little: ${a.severity}, nothing tactical.`,
   (a) => `${a.san} is ${a.severity}, nothing more dramatic than that.`,
-  (a) => `No tactic there — ${a.san} is just ${a.severity}.`,
+  (a) => `No tactic there. ${a.san} is just ${a.severity}.`,
   (a) => `${a.san} drifts a little; call it ${a.severity}.`,
-  (a) => `That's ${a.severity}, not a hard blunder — just a small loss of precision.`,
-  (a) => `${a.san} isn't sharp — ${a.severity}, plain and simple.`,
-  (a) => `${a.san} lets a little slip through — ${a.severity}.`,
+  (a) => `That's ${a.severity} rather than a hard blunder, just a small loss of precision.`,
+  (a) => `${a.san} isn't sharp: ${a.severity}, plain and simple.`,
+  (a) => `${a.san} lets a little slip through: ${a.severity}.`,
   (a) => `Nothing tactical there, just ${a.severity} from ${a.san}.`,
   (a) => `${a.san} is ${a.severity} rather than anything forced.`,
-  (a) => `That's ${a.severity} — the position loosens slightly.`,
+  (a) => `That's ${a.severity}, and the position loosens slightly.`,
 ];
 export const fallbackDetails: readonly ((a: { bestSan: string; lossText: string }) => string)[] = [
   (a) => `${a.bestSan} would have kept things a bit more precise. (~${a.lossText} pawns)`,

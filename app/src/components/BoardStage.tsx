@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ChessBoard from './ChessBoard';
-import { IconChevronLeft, IconChevronRight } from './icons';
 import type { BoardShape } from '../lib/explanations';
 
 interface BoardStageProps {
@@ -29,13 +28,18 @@ interface BoardStageProps {
 /** A tap is only a tap if the finger barely moved and lifted quickly. */
 const TAP_SLOP_PX = 12;
 const TAP_MAX_MS = 500;
-/** Second tap in the same zone within this window jumps to the end/start. */
-const DOUBLE_TAP_MS = 320;
+/** Hold a side of the board this long to jump to that end of the game.
+ *  Replaces a double tap: a double tap made every ordinary step ambiguous
+ *  until the window expired, and on a board you are also dragging pieces
+ *  on, two quick taps are easy to produce by accident. A hold is
+ *  deliberate, and it can show what it is about to do before it does it. */
+const HOLD_MS = 450;
 /** Horizontal travel that counts as a swipe rather than a tap. */
 const SWIPE_MIN_PX = 40;
 const SWIPE_RATIO = 1.6;
-/** Eval rail width plus the gap between it and the board. */
-const RAIL_TOTAL_PX = 18;
+/** Eval rail width plus the gap between it and the board. Kept tight:
+ *  every pixel here comes straight out of the board's edge. */
+const RAIL_TOTAL_PX = 12;
 
 type Zone = 'prev' | 'next' | 'center';
 
@@ -87,7 +91,10 @@ export default function BoardStage({
   /* ── Gestures ──────────────────────────────────────────────── */
 
   const pointer = useRef<{ x: number; y: number; t: number; zone: Zone } | null>(null);
-  const lastTap = useRef<{ zone: Zone; t: number } | null>(null);
+  /** Set when a hold has already fired, so the release that follows is
+   *  not also read as a tap. */
+  const held = useRef(false);
+  const holdTimer = useRef<number | undefined>(undefined);
 
   const [flashed, setFlashed] = useState<Zone | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -147,16 +154,31 @@ export default function BoardStage({
     [canPrevious, canNext, onStart, onEnd, flash, announce],
   );
 
-  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const zone = (e.currentTarget.dataset.zone ?? 'center') as Zone;
-    pointer.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, zone };
-  }, []);
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const zone = (e.currentTarget.dataset.zone ?? 'center') as Zone;
+      pointer.current = { x: e.clientX, y: e.clientY, t: e.timeStamp, zone };
+      held.current = false;
+      window.clearTimeout(holdTimer.current);
+      if (zone === 'center') return;
+      holdTimer.current = window.setTimeout(() => {
+        // Only if the finger is still down and still where it started.
+        if (!pointer.current || pointer.current.zone !== zone) return;
+        held.current = true;
+        jump(zone);
+      }, HOLD_MS);
+    },
+    [jump],
+  );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const start = pointer.current;
       pointer.current = null;
+      window.clearTimeout(holdTimer.current);
       if (!start) return;
+      // The hold already acted; releasing must not step as well.
+      if (held.current) { held.current = false; return; }
 
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
@@ -165,38 +187,21 @@ export default function BoardStage({
       // A decisive horizontal drag steps regardless of which zone it began
       // in — swiping across the board is the same intent as tapping a side.
       if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) > Math.abs(dy) * SWIPE_RATIO) {
-        const zone: Zone = dx < 0 ? 'next' : 'prev';
-        lastTap.current = null;
-        step(zone);
+        step(dx < 0 ? 'next' : 'prev');
         return;
       }
 
       if (Math.hypot(dx, dy) > TAP_SLOP_PX || elapsed > TAP_MAX_MS) return;
       if (start.zone === 'center') return;
 
-      // Second tap in the same zone jumps to that end of the game. The
-      // first tap's single step already happened and is simply superseded
-      // — that keeps stepping instant instead of waiting out a
-      // double-tap timeout on every single tap.
-      const previous = lastTap.current;
-      const isDouble =
-        previous !== null &&
-        previous.zone === start.zone &&
-        e.timeStamp - previous.t <= DOUBLE_TAP_MS;
-
-      if (isDouble) {
-        lastTap.current = null;
-        jump(start.zone);
-        return;
-      }
-
-      lastTap.current = { zone: start.zone, t: e.timeStamp };
       step(start.zone);
     },
-    [step, jump],
+    [step],
   );
 
   const handlePointerCancel = useCallback(() => {
+    window.clearTimeout(holdTimer.current);
+    held.current = false;
     pointer.current = null;
   }, []);
 
@@ -234,15 +239,11 @@ export default function BoardStage({
           <div
             className={`step-zones${hinting ? ' is-hinting' : ''}`}
             role="group"
-            aria-label="Tap the left or right of the board to step through the game; double tap to jump to the start or end"
+            aria-label="Tap the left or right of the board to step through the game; press and hold to jump to the start or end"
           >
-            <div {...zoneProps('prev', !canPrevious)}>
-              <span className="step-zone-chevron"><IconChevronLeft /></span>
-            </div>
+            <div {...zoneProps('prev', !canPrevious)} />
             <div {...zoneProps('center', false)} />
-            <div {...zoneProps('next', !canNext)}>
-              <span className="step-zone-chevron"><IconChevronRight /></span>
-            </div>
+            <div {...zoneProps('next', !canNext)} />
           </div>
         )}
 

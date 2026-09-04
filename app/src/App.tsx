@@ -3,20 +3,23 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import BoardStage from './components/BoardStage';
 import HomeFlow from './components/HomeFlow';
+import PieceField from './components/PieceField';
 import MoveList from './components/MoveList';
+import MoveStrip from './components/MoveStrip';
+import ReviewOverlay from './components/ReviewOverlay';
+import SettingsScreen from './components/SettingsScreen';
+import AssetGate from './components/AssetGate';
+import { useAssets } from './lib/assets';
 import EnginePanel from './components/EnginePanel';
 import GameGraph from './components/GameGraph.tsx';
 import {
-  ChesyMark,
   IconBack,
-  IconChevronLeft,
-  IconChevronRight,
   IconFlip,
-  IconSkipEnd,
-  IconSkipStart,
-  IconSun,
-  IconMoon,
   IconTarget,
+  IconChart,
+  IconClock,
+  IconChevronDown,
+  IconSettings,
 } from './components/icons';
 import { parsePgn, type ParsedGame } from './lib/parsePgn';
 import {
@@ -64,14 +67,26 @@ import type {
 } from './lib/analysis.ts';
 import type { BoardShape } from './lib/explanations.ts';
 import { generateSlmExplanation, numericMismatch, type MoveFacts, type SlmState } from './lib/slm.ts';
-import { applyTheme, initialTheme, type Theme } from './lib/theme.ts';
+import { describeMoment, findCriticalMoments } from './lib/criticalMoments.ts';
+import { useT } from './lib/i18n.ts';
+import {
+  hasUsableAnalysis,
+  toAnalysisResults,
+  type LichessAnalysisEntry,
+} from './lib/lichessAnalysis.ts';
+import { parseTimeControl, timeInsights, timeSpentPerMove, RUSHED_SECONDS } from './lib/clock.ts';
+import { bookExitPly, openingFrom } from './lib/openings.ts';
+import { PHASE_LABELS, phaseAccuracy, phasesFor } from './lib/phases.ts';
+import {
+  applySettings,
+  loadSettings,
+  resolveTheme,
+  saveSettings,
+  type Settings,
+} from './lib/settings.ts';
 import './App.css';
 
 type ReviewMode = 'fast' | 'deep';
-
-/** Which pane the side column shows; only meaningful below 1280px, where
- *  there is no room to show the insight card and the move list at once. */
-type Pane = 'insight' | 'moves';
 
 const CLASSIFICATION_LABELS: Record<string, string> = {
   brilliant: 'Brilliant', great: 'Great', best: 'Best', excellent: 'Excellent',
@@ -108,6 +123,7 @@ const REVIEW_SETTINGS: Record<ReviewMode, { depth: number; multiPv: number }> = 
 };
 
 function App() {
+  const tr = useT();
   const [game, setGame] = useState<ParsedGame | null>(null);
   const [currentIndex, setCurrentIndex] = useState(-1); // -1 = starting position
 
@@ -116,21 +132,40 @@ function App() {
   const [reviewing, setReviewing] = useState(false);
   const [reviewProgress, setReviewProgress] = useState<{ current: number; total: number } | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
-  const [reviewMode, setReviewMode] = useState<ReviewMode>('deep');
-  const [activePane, setActivePane] = useState<Pane>('insight');
-  // Measured board edge, mirrored here so the stage's other rows can be
-  // pinned to the board's width instead of the window's.
-  const [boardPx, setBoardPx] = useState(0);
-  // The map competes with the board for the shell's fixed height, so it
-  // can be folded away when the board matters more.
-  const [graphOpen, setGraphOpen] = useState(true);
+  const [reviewMode, setReviewMode] = useState<ReviewMode>(() => loadSettings().depth);
+  /** Which secondary reading is open over the review, if any. These
+   *  used to be a permanent strip of the layout, which is what left
+   *  the board at 130px on a phone. */
+  const [extra, setExtra] = useState<'graph' | 'time' | null>(null);
+  /** The step HomeFlow is on, lifted up so the app has exactly one top
+   *  bar. `onBack` null means the first screen — the only place the logo
+   *  and the theme control appear. */
+  const [homeNav, setHomeNav] = useState<{
+    title: string;
+    onBack: (() => void) | null;
+    onTitleTap?: (() => void) | null;
+  }>({ title: '', onBack: null });
+  /** Open state of the account menu hanging off the title. */
+  const [accountMenu, setAccountMenu] = useState(false);
 
   const [engineInfo, setEngineInfo] = useState<EngineInfo | null>(null);
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [settings, setSettings] = useState<Settings>(loadSettings);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
-    applyTheme(theme);
-  }, [theme]);
+    applySettings(settings);
+    saveSettings(settings);
+  }, [settings]);
+
+  // "System" is a live choice, not a one-off reading: the OS can change
+  // theme under a running app, and following it means following it.
+  useEffect(() => {
+    if (settings.theme !== 'system') return;
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const sync = () => applySettings(settings);
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  }, [settings]);
   const [showArrows, setShowArrows] = useState(true);
   const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
 
@@ -153,6 +188,16 @@ function App() {
   const [currentPgn, setCurrentPgn] = useState<string>('');
   const [recentReviews, setRecentReviews] = useState<ReviewSummary[]>([]);
   const [practice, setPractice] = useState<PracticeSession | null>(null);
+  // Where the current review's numbers came from. Worth surfacing: an
+  // imported analysis is a different depth, and can't produce Great or
+  // Brilliant, so presenting it as identical to a local run would be
+  // quietly misleading.
+  const [reviewSource, setReviewSource] = useState<'engine' | 'lichess'>('engine');
+
+  // What the app still has to fetch before it can review anything. On
+  // every run after the first this resolves to "nothing missing" and the
+  // gate below never appears.
+  const assets = useAssets();
 
   const refreshRecent = useCallback(() => {
     listReviews()
@@ -181,7 +226,7 @@ function App() {
       });
   }, []);
 
-  const handleImport = (pgn: string) => {
+  const handleImport = (pgn: string, analysis?: LichessAnalysisEntry[]) => {
     reviewRequest.current += 1;
     // Stop the engine now rather than waiting for the new game's
     // auto-review to supersede it ~120ms later — and before parsing, so
@@ -201,13 +246,44 @@ function App() {
     try {
       const parsed = parsePgn(pgn);
       setCurrentPgn(pgn);
-      setGame(parsed);
       setCurrentIndex(-1);
-      setAnalysisResults(null);
-      setReview(null);
       setReviewProgress(null);
       setReviewError(null);
       setSlmExplanations({});
+
+      if (hasUsableAnalysis(analysis, parsed)) {
+        // The source already analysed this game, so the whole review can
+        // be rendered from data that arrived with the download — no
+        // engine, no wait, no battery. Marking it auto-reviewed before
+        // the state update is what stops the auto-review effect from
+        // launching Stockfish over a game that is already done.
+        const imported = toAnalysisResults(analysis!, parsed);
+        const built = reviewGame(parsed, imported);
+        autoReviewedGame.current = parsed;
+        setGame(parsed);
+        setAnalysisResults(imported);
+        setReview(built);
+        setReviewSource('lichess');
+
+        // Saved on the same terms as an engine review, so an imported
+        // game still appears in the library and still feeds the
+        // cross-game weakness stats.
+        const id = reviewId(pgn);
+        void saveReview({
+          summary: buildSummary(id, parsed, built),
+          pgn,
+          analysis: imported,
+          depth: 0,
+          multiPv: 1,
+        })
+          .then(refreshRecent)
+          .catch((err) => console.error('Could not save this review:', err));
+      } else {
+        setGame(parsed);
+        setAnalysisResults(null);
+        setReview(null);
+        setReviewSource('engine');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       alert(`Could not parse that PGN: ${message}`);
@@ -229,6 +305,7 @@ function App() {
     setReview(null);
     setAnalysisResults(null);
     setSlmExplanations({});
+    setReviewSource('engine');
 
     // Per-run local bookkeeping for incremental classification — plain
     // locals rather than state/refs, since only the listener closures
@@ -615,6 +692,48 @@ function App() {
     return () => requestSlmDeepDive(index, facts);
   }, [currentIndex, currentSlmFacts, requestSlmDeepDive]);
 
+  // Seconds each move actually took, derived from the clock readings the
+  // PGN already carried and previously threw away.
+  const timeSpent = useMemo(() => {
+    if (!game) return [];
+    const { base, increment } = parseTimeControl(game.headers.TimeControl);
+    return timeSpentPerMove(game, game.moves.map((m) => m.clock ?? null), increment, base);
+  }, [game]);
+
+  const clockSummary = useMemo(() => {
+    if (!game || !review || review.moves.length === 0) return null;
+    const classes = review.moves.map((m) => m.classification);
+    const colors = review.moves.map((m) => m.color);
+    return {
+      white: timeInsights(timeSpent, classes, colors, 'w'),
+      black: timeInsights(timeSpent, classes, colors, 'b'),
+    };
+  }, [game, review, timeSpent]);
+
+  // Named from the PGN's own headers; the book-exit ply comes from
+  // Chesy's mined book, which answers a different question — where the
+  // player stopped following moves other players actually play.
+  const opening = useMemo(() => {
+    if (!game) return null;
+    const info = openingFrom(game.headers);
+    if (!info.name && !info.eco) return null;
+    return { ...info, exitPly: bookExitPly(game) };
+  }, [game]);
+
+  const phaseSplit = useMemo(() => {
+    if (!review || review.moves.length === 0) return null;
+    const phases = phasesFor(review, opening?.exitPly ?? null);
+    return {
+      white: phaseAccuracy(review, phases, 'w'),
+      black: phaseAccuracy(review, phases, 'b'),
+    };
+  }, [review, opening]);
+
+  const criticalMoments = useMemo(
+    () => (review && isReviewComplete ? findCriticalMoments(review, 3) : []),
+    [review, isReviewComplete],
+  );
+
   const displayMoves = useMemo(() => {
     if (!game) return [];
     if (!review) return game.moves;
@@ -654,11 +773,13 @@ function App() {
   const canPrevious = currentIndex > -1;
   const canNext = !!game && currentIndex < game.moves.length - 1;
 
-  const moveLabel = !game
-    ? ''
-    : currentIndex === -1
-      ? 'Starting position'
-      : `${game.moves[currentIndex].moveNumber}${game.moves[currentIndex].color === 'w' ? '.' : '…'} ${game.moves[currentIndex].san}`;
+  /** Whether this game carried clock annotations at all. Games from a
+   *  PGN without `%clk` have none, and an empty panel behind an
+   *  enabled button is worse than no button. */
+  const hasClockData = !!clockSummary && !!(clockSummary.white || clockSummary.black);
+
+  /** The one screen that shows the logo and the theme control. */
+  const atHome = !game && !showSettings && homeNav.onBack === null;
 
   const evalPercent = evalToPercent(
     currentAnalysis?.evalCp ?? null,
@@ -667,36 +788,127 @@ function App() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        {game && (
+      {/* The website's chess field, behind the whole shell. It only
+          animates on the menu screens: once a game is open Stockfish is
+          searching and the board has to stay smooth, so the field is
+          painted once and left alone. */}
+      {/* The user can turn the drift off outright — it is the one piece
+          of decoration that never stops, and it is also what every glass
+          surface is paying to blur. */}
+      <PieceField
+        mode={settings.motion === 'static' || game ? 'static' : 'live'}
+        theme={resolveTheme(settings.theme)}
+      />
+
+      <header className={`topbar${atHome ? '' : ' glass'}`}>
+        {/* One bar for the whole app. The logo and the theme control are
+            the first screen's alone; every other screen gets a back
+            button in that corner instead, so the way out is always in the
+            same place. */}
+        {/* At home, the wordmark only. The crown sat opposite the
+            settings icon and earned nothing on a screen the user has
+            already chosen to open; the name alone says where they are. */}
+        {atHome ? (
+          <span className="brand">
+            <span>Chesy</span>
+          </span>
+        ) : (
           <button
             type="button"
             className="icon-btn"
-            onClick={goBackToImport}
-            aria-label="Back to import"
-            title="Back to import"
+            onClick={
+              showSettings
+                ? () => setShowSettings(false)
+                : game
+                  ? goBackToImport
+                  : homeNav.onBack ?? undefined
+            }
+            aria-label={tr('nav.back')}
+            title={tr('nav.back')}
           >
             <IconBack />
           </button>
         )}
 
-        <span className="brand">
-          <ChesyMark className="brand-mark" />
-          <span>Chesy</span>
-        </span>
+        <div className="topbar-title">
+          {!game && homeNav.onTitleTap ? (
+            /* The title names the connected account, so it is also where
+               you change it — no row anywhere else on the screen, which
+               is what leaves the whole page for the games. */
+            <button
+              type="button"
+              className="title-action"
+              onClick={() => setAccountMenu((v) => !v)}
+              aria-expanded={accountMenu}
+              aria-haspopup="menu"
+            >
+              <span className="players">{homeNav.title}</span>
+              <IconChevronDown className={accountMenu ? 'is-open' : undefined} />
+            </button>
+          ) : null}
 
-        {game && (
-          <div className="topbar-title">
+          {accountMenu && homeNav.onTitleTap && (
+            <>
+              <div className="menu-scrim" onPointerDown={() => setAccountMenu(false)} />
+              {/* Anchored under the name it acts on. Centring it on the
+                  viewport left it sitting off to one side of a title that
+                  is not itself centred. */}
+              <div className="account-menu glass" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    homeNav.onTitleTap?.();
+                    setAccountMenu(false);
+                  }}
+                >
+                  {tr('connect.switch')}
+                </button>
+              </div>
+            </>
+          )}
+
+          {!(!game && homeNav.onTitleTap) && (
             <span className="players muted">
-              {game.headers.White ?? '?'} vs {game.headers.Black ?? '?'}
+              {showSettings
+                ? tr('nav.settings')
+                : game
+                  ? `${game.headers.White ?? '?'} vs ${game.headers.Black ?? '?'}`
+                  : homeNav.title}
             </span>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="topbar-actions">
-          {/* The engine's identity was a permanent pill here; it is
-              static information that only matters when something is
-              wrong, so it now shows only in that case. */}
+          {/* Board chrome, not board content. These sat in a row above the
+              board and were the elements that overflowed it on a phone —
+              a 160px toolbar inside a 130px column. */}
+          {game && (
+            <>
+              <button
+                type="button"
+                className={`icon-btn ${showArrows ? 'is-active' : ''}`}
+                onClick={() => setShowArrows(!showArrows)}
+                aria-pressed={showArrows}
+                aria-label="Toggle tactical arrows"
+                title="Toggle tactical arrows and motif highlights"
+              >
+                <IconTarget />
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={toggleOrientation}
+                aria-label={`Flip board (showing ${boardOrientation})`}
+                title="Flip the board (hotkey: F)"
+              >
+                <IconFlip />
+              </button>
+            </>
+          )}
+
+          {/* Static information that only matters when something is
+              wrong, so it shows only in that case. */}
           {engineInfo && !engineInfo.available && (
             <span className="status-pill is-warning">
               <span className="status-dot" />
@@ -704,69 +916,112 @@ function App() {
             </span>
           )}
 
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
-            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-            title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
-          >
-            {theme === 'dark' ? <IconSun /> : <IconMoon />}
-          </button>
+          {atHome && (
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={() => setShowSettings(true)}
+              aria-label={tr('nav.settings')}
+              title={tr('nav.settings')}
+            >
+              <IconSettings />
+            </button>
+          )}
         </div>
       </header>
 
-      {!game && (
+      {showSettings && (
+        <SettingsScreen settings={settings} onChange={setSettings} />
+      )}
+
+      {/* Nothing else is reachable until the engine has what it needs —
+          every screen here leads to a review, and a review without the
+          networks would fail at the last step instead of the first. The
+          settings screen stays open, so the language can still be
+          changed while waiting. */}
+      {!game && !showSettings && assets.missing.length > 0 && (
+        <AssetGate assets={assets} />
+      )}
+
+      {!game && !showSettings && assets.assets !== null && assets.missing.length === 0 && (
         <HomeFlow
           onImport={handleImport}
           recent={recentReviews}
           onOpenRecent={(id) => void openStoredReview(id)}
+          onNav={setHomeNav}
         />
       )}
 
       {game && currentFen && (
         <main className="review">
-          <section
-            className="stage"
-            style={{ ['--board-px' as string]: boardPx ? `${boardPx}px` : undefined }}
-          >
-            <div className="stage-head">
-              <div className="stage-move">
-                <span className="san">{moveLabel}</span>
-                {currentClassification && (
-                  <span className={`badge badge-${currentClassification}`}>
-                    {CLASSIFICATION_LABELS[currentClassification] ?? currentClassification}
-                  </span>
-                )}
-              </div>
+          {/* Insight first. The explanation is what this screen exists to
+              deliver, so on a phone it sits above the board where it can be
+              read without moving anything. The board follows it, and
+              navigation lives on the board itself. */}
+          <section className="band band-insight glass">
+            <EnginePanel
+              fen={currentFen}
+              analysis={currentAnalysis}
+              classification={currentClassification}
+              explanation={currentExplanation}
+              slmState={currentSlmState}
+              onRequestDeepDive={handleRequestDeepDive}
+              loading={reviewing}
+              progressPercent={progressPercent}
+              practice={practice}
+              canPractice={canPractice}
+              practiceBestSan={practiceBestSan}
+              onStartPractice={startPractice}
+              onRevealPractice={revealPracticeAnswer}
+              onExitPractice={exitPractice}
+            />
 
-              <div className="stage-tools">
+            {!isReviewComplete && (
+              <div className="review-actions">
+                <div className="mode-toggle" role="group" aria-label="Review depth">
+                  <button
+                    type="button"
+                    className={`chip-btn ${reviewMode === 'fast' ? 'is-active' : ''}`}
+                    onClick={() => setReviewMode('fast')}
+                    disabled={reviewing}
+                    title="Depth 10, single line. Faster, but no Great/Brilliant detection. Best for weaker hardware."
+                  >
+                    Fast
+                  </button>
+                  <button
+                    type="button"
+                    className={`chip-btn ${reviewMode === 'deep' ? 'is-active' : ''}`}
+                    onClick={() => setReviewMode('deep')}
+                    disabled={reviewing}
+                    title="Depth 14, two lines. Full classification including Great/Brilliant, but slower."
+                  >
+                    Deep
+                  </button>
+                </div>
                 <button
                   type="button"
-                  className={`chip-btn ${showArrows ? 'is-active' : ''}`}
-                  onClick={() => setShowArrows(!showArrows)}
-                  title="Toggle tactical arrows and motif highlights"
+                  className="btn btn-primary btn-block"
+                  onClick={handleReview}
+                  disabled={reviewing}
                 >
-                  <IconTarget />
-                  Arrows
-                </button>
-                <button
-                  type="button"
-                  className="chip-btn"
-                  onClick={toggleOrientation}
-                  title="Flip the board (hotkey: F)"
-                >
-                  <IconFlip />
-                  {boardOrientation === 'white' ? 'White' : 'Black'}
+                  {reviewing
+                    ? tr('review.reviewing', { percent: progressPercent ?? 0 })
+                    : review
+                      ? tr('review.retry')
+                      : tr('review.reviewGame')}
                 </button>
               </div>
-            </div>
+            )}
 
+            {reviewError && <div className="notice">{reviewError}</div>}
+          </section>
+
+          <section className="band band-board">
             {reviewing && reviewProgress && (
               <div className="progress">
                 <div className="progress-label">
                   <span>
-                    Evaluating {reviewProgress.current} of {reviewProgress.total} positions
+                    {tr('review.evaluating', { current: reviewProgress.current, total: reviewProgress.total })}
                   </span>
                   <span className="numeric">{progressPercent}%</span>
                 </div>
@@ -776,199 +1031,60 @@ function App() {
               </div>
             )}
 
-            <div className="stage-inner">
-              <BoardStage
-                // While practising, the board rewinds to the position the
-                // mistake was played from — that's the position being
-                // drilled, not the one after it.
-                fen={practice ? practice.fenBefore : currentFen}
-                evalPercent={evalPercent}
-                shapes={currentShapes}
-                orientation={boardOrientation}
-                canPrevious={canPrevious}
-                canNext={canNext}
-                onPrevious={goToPrevious}
-                onNext={goToNext}
-                onStart={goToStart}
-                onEnd={goToEnd}
-                onMeasure={setBoardPx}
-                interactive={!!practice && practice.status !== 'revealed'}
-                onMove={handlePracticeMove}
-              />
-            </div>
-
-            <nav className="stepper" aria-label="Move navigation">
-              <button
-                type="button"
-                className="step-btn"
-                onClick={goToStart}
-                disabled={!canPrevious}
-                aria-label="Starting position"
-              >
-                <IconSkipStart />
-              </button>
-              <button
-                type="button"
-                className="step-btn"
-                onClick={goToPrevious}
-                disabled={!canPrevious}
-                aria-label="Previous move"
-              >
-                <IconChevronLeft />
-              </button>
-              <span className="step-count">
-                {currentIndex + 1} / {game.moves.length}
-              </span>
-              <button
-                type="button"
-                className="step-btn"
-                onClick={goToNext}
-                disabled={!canNext}
-                aria-label="Next move"
-              >
-                <IconChevronRight />
-              </button>
-              <button
-                type="button"
-                className="step-btn"
-                onClick={goToEnd}
-                disabled={!canNext}
-                aria-label="Final position"
-              >
-                <IconSkipEnd />
-              </button>
-            </nav>
-
-            {review && (
-              <div className={`graph-wrap${graphOpen ? '' : ' is-collapsed'}`}>
-                <div className="graph-head">
-                  <span className="eyebrow">Position map</span>
-                  {/* The curve alone can't say which move a peak belongs
-                      to. This names the move under the cursor as it is
-                      scrubbed, which is what makes the shape actionable. */}
-                  <span className="graph-readout">
-                    {currentIndex >= 0 && review.moves[currentIndex] ? (
-                      <>
-                        <span className="graph-readout-move">
-                          {review.moves[currentIndex].moveNumber}
-                          {review.moves[currentIndex].color === 'w' ? '.' : '…'}{' '}
-                          {review.moves[currentIndex].san}
-                        </span>
-                        <span className={`graph-readout-tag c-${review.moves[currentIndex].classification}`}>
-                          {CLASSIFICATION_LABELS[review.moves[currentIndex].classification]}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="graph-readout-move faint">Starting position</span>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    className="graph-toggle"
-                    onClick={() => setGraphOpen((v) => !v)}
-                    aria-expanded={graphOpen}
-                    aria-label={graphOpen ? 'Hide position map' : 'Show position map'}
-                    title={graphOpen ? 'Hide position map' : 'Show position map'}
-                  >
-                    <IconChevronRight />
-                  </button>
-                </div>
-
-                {graphOpen && (
-                  <GameGraph
-                    moves={review.moves}
-                    totalMoves={game.moves.length}
-                    currentIndex={currentIndex}
-                    onSelect={setCurrentIndex}
-                  />
-                )}
-              </div>
-            )}
+            <BoardStage
+              // While practising, the board rewinds to the position the
+              // mistake was played from — that's the position being
+              // drilled, not the one after it.
+              fen={practice ? practice.fenBefore : currentFen}
+              evalPercent={evalPercent}
+              shapes={currentShapes}
+              orientation={boardOrientation}
+              canPrevious={canPrevious}
+              canNext={canNext}
+              onPrevious={goToPrevious}
+              onNext={goToNext}
+              onStart={goToStart}
+              onEnd={goToEnd}
+              interactive={!!practice && practice.status !== 'revealed'}
+              onMove={handlePracticeMove}
+            />
           </section>
 
-          <div className="side is-desktop">
-            <div className="pane-tabs" role="tablist" aria-label="Review detail">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activePane === 'insight'}
-                className={`pane-tab ${activePane === 'insight' ? 'is-active' : ''}`}
-                onClick={() => setActivePane('insight')}
-              >
-                Insight
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activePane === 'moves'}
-                className={`pane-tab ${activePane === 'moves' ? 'is-active' : ''}`}
-                onClick={() => setActivePane('moves')}
-              >
-                Moves
-              </button>
-            </div>
+          {/* Where you are in the game. The board already steps and jumps
+              on tap, so this carries position rather than controls. */}
+          <MoveStrip
+            moves={displayMoves}
+            currentIndex={currentIndex}
+            onSelect={setCurrentIndex}
+          />
 
-            <div className={`pane pane-insight ${activePane === 'insight' ? '' : 'is-collapsed'}`}>
+          <div className="extras">
+            <button
+              type="button"
+              className="extra-btn"
+              onClick={() => setExtra('graph')}
+              disabled={!review}
+            >
+              <IconChart />
+              <span>{tr('review.graph')}</span>
+            </button>
+            <button
+              type="button"
+              className="extra-btn"
+              onClick={() => setExtra('time')}
+              disabled={!hasClockData}
+            >
+              <IconClock />
+              <span>{tr('review.time')}</span>
+            </button>
+          </div>
 
-              <EnginePanel
-                fen={currentFen}
-                analysis={currentAnalysis}
-                classification={currentClassification}
-                explanation={currentExplanation}
-                slmState={currentSlmState}
-                onRequestDeepDive={handleRequestDeepDive}
-                loading={reviewing}
-                progressPercent={progressPercent}
-                practice={practice}
-                canPractice={canPractice}
-                practiceBestSan={practiceBestSan}
-                onStartPractice={startPractice}
-                onRevealPractice={revealPracticeAnswer}
-                onExitPractice={exitPractice}
-              />
-
-              {!isReviewComplete && (
-                <div className="review-actions">
-                  <div className="mode-toggle" role="group" aria-label="Review depth">
-                    <button
-                      type="button"
-                      className={`chip-btn ${reviewMode === 'fast' ? 'is-active' : ''}`}
-                      onClick={() => setReviewMode('fast')}
-                      disabled={reviewing}
-                      title="Depth 10, single line — faster, no Great/Brilliant detection. Best for weaker hardware."
-                    >
-                      Fast
-                    </button>
-                    <button
-                      type="button"
-                      className={`chip-btn ${reviewMode === 'deep' ? 'is-active' : ''}`}
-                      onClick={() => setReviewMode('deep')}
-                      disabled={reviewing}
-                      title="Depth 14, two lines — full classification including Great/Brilliant. Slower."
-                    >
-                      Deep
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-block"
-                    onClick={handleReview}
-                    disabled={reviewing}
-                  >
-                    {reviewing
-                      ? `Reviewing ${progressPercent ?? 0}%`
-                      : review
-                        ? 'Retry review'
-                        : 'Review game'}
-                  </button>
-                </div>
-              )}
-
-              {reviewError && <div className="notice">{reviewError}</div>}
-            </div>
-
-            <div className={`pane pane-moves ${activePane === 'moves' ? '' : 'is-collapsed'}`}>
-              {review && (
+          {/* Tablet and desktop have room to show, permanently, what the
+              phone puts behind those buttons. Same components, different
+              parent — nothing here is a second implementation. */}
+          <aside className="detail">
+            {review && (
+              <>
                 <div className="accuracy">
                   {([
                     ['White', review.whiteAccuracy],
@@ -989,11 +1105,173 @@ function App() {
                     </div>
                   ))}
                 </div>
+              </>
+            )}
+
+            <MoveList moves={displayMoves} currentIndex={currentIndex} onSelect={setCurrentIndex} />
+          </aside>
+
+          {extra === 'graph' && review && (
+            <ReviewOverlay
+              title={tr('review.positionMap')}
+              subtitle={tr('review.positionMap.help')}
+              onClose={() => setExtra(null)}
+            >
+              <div className="graph-meta">
+                {opening && (
+                  <span className="opening-tag">
+                    {opening.name ?? opening.eco}
+                    {opening.exitPly !== null && (
+                      <span className="opening-exit num">
+                        {' '}· book to {Math.floor(opening.exitPly / 2) + 1}
+                      </span>
+                    )}
+                  </span>
+                )}
+                {/* Stated plainly rather than passed off as a local run: an
+                    imported analysis is a different depth and carries no
+                    runner-up line, so it cannot produce Great or Brilliant. */}
+                {reviewSource === 'lichess' && (
+                  <span className="source-tag">via Lichess</span>
+                )}
+                <span className="graph-readout">
+                  {currentIndex >= 0 && review.moves[currentIndex] ? (
+                    <>
+                      <span className="graph-readout-move">
+                        {review.moves[currentIndex].moveNumber}
+                        {review.moves[currentIndex].color === 'w' ? '.' : '…'}{' '}
+                        {review.moves[currentIndex].san}
+                      </span>
+                      <span className={`graph-readout-tag c-${review.moves[currentIndex].classification}`}>
+                        {CLASSIFICATION_LABELS[review.moves[currentIndex].classification]}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="graph-readout-move faint">Starting position</span>
+                  )}
+                </span>
+              </div>
+
+              {/* Scrolls sideways rather than squeezing a 90-move game
+                  into 328px. Below about 14px per move the markers stop
+                  being separable, let alone tappable. */}
+              <div className="graph-scroll">
+                <div
+                  className="graph-track"
+                  style={{ minWidth: `${Math.max(300, game.moves.length * 14)}px` }}
+                >
+                  <GameGraph
+                    moves={review.moves}
+                    totalMoves={game.moves.length}
+                    currentIndex={currentIndex}
+                    onSelect={setCurrentIndex}
+                  />
+                </div>
+              </div>
+
+              {/* The turning points belong with the curve — each one is a
+                  place it swings — and putting them here is also what
+                  keeps them reachable on a phone, where the detail column
+                  does not exist. Tapping one jumps the board to it. */}
+              {criticalMoments.length > 0 && (
+                <div className="moments">
+                  <p className="section-label">{tr('review.turningPoints')}</p>
+                  <ul className="moments-list">
+                    {criticalMoments.map((m) => (
+                      <li key={m.index}>
+                        <button
+                          type="button"
+                          className={`moment${m.index === currentIndex ? ' is-active' : ''}`}
+                          onClick={() => { setCurrentIndex(m.index); setExtra(null); }}
+                        >
+                          <span className={`moment-dot c-${m.move.classification}`} />
+                          <span className="moment-move num">
+                            {m.move.moveNumber}
+                            {m.move.color === 'w' ? '.' : '…'} {m.move.san}
+                          </span>
+                          <span className="moment-note">{describeMoment(m)}</span>
+                          {/* Win probability, not centipawns: it is what
+                              makes two moments comparable. */}
+                          <span className="moment-swing num">−{Math.round(m.swing)}%</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
-              <MoveList moves={displayMoves} currentIndex={currentIndex} onSelect={setCurrentIndex} />
-            </div>
-          </div>
+              {phaseSplit && phaseSplit.white.length > 1 && (
+                <div className="phases">
+                  <p className="section-label">{tr('review.accuracyByPhase')}</p>
+                  {(
+                    [
+                      ['White', phaseSplit.white],
+                      ['Black', phaseSplit.black],
+                    ] as const
+                  ).map(([side, rows]) => (
+                    <div className="phase-row" key={side}>
+                      <span className="phase-side">{side}</span>
+                      {rows.map((r) => (
+                        <span className="phase-cell" key={r.phase}>
+                          <span className="phase-name">{PHASE_LABELS[r.phase]}</span>
+                          <span className={`phase-value num c-${accuracyBand(r.accuracy)}`}>
+                            {r.accuracy.toFixed(0)}%
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ReviewOverlay>
+          )}
+
+          {extra === 'time' && hasClockData && (
+            <ReviewOverlay
+              title={tr('review.timeSpent')}
+              subtitle={tr('review.timeSpent.help')}
+              onClose={() => setExtra(null)}
+            >
+              <div className="clocks">
+                {(
+                  [
+                    ['White', clockSummary!.white],
+                    ['Black', clockSummary!.black],
+                  ] as const
+                ).map(([side, ins]) =>
+                  ins ? (
+                    <div className="clock-row" key={side}>
+                      <span className="clock-side">{side}</span>
+                      <span className="clock-stat num">{ins.medianSeconds.toFixed(1)}s</span>
+                      <span className="clock-label">median</span>
+                      {/* The number that matters: mistakes made while
+                          rushing are a different problem from mistakes
+                          made after a long think. */}
+                      {ins.totalMistakes > 0 && (
+                        <span className="clock-rushed">
+                          {ins.rushedMistakes}/{ins.totalMistakes} costly moves rushed
+                        </span>
+                      )}
+                    </div>
+                  ) : null,
+                )}
+              </div>
+
+              {currentIndex >= 0 &&
+                timeSpent[currentIndex] !== null &&
+                timeSpent[currentIndex] !== undefined && (
+                  <p className="clock-current">
+                    This move took{' '}
+                    <strong className={timeSpent[currentIndex]! < RUSHED_SECONDS ? 'is-rushed' : ''}>
+                      {timeSpent[currentIndex]! < 10
+                        ? `${timeSpent[currentIndex]!.toFixed(1)}s`
+                        : `${Math.round(timeSpent[currentIndex]!)}s`}
+                    </strong>
+                    {timeSpent[currentIndex]! < RUSHED_SECONDS && ', played almost instantly.'}
+                  </p>
+                )}
+            </ReviewOverlay>
+          )}
         </main>
       )}
     </div>

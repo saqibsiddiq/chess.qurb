@@ -198,15 +198,24 @@ fn walk(root: &Path, depth: usize, dirs_visited: &mut usize, out: &mut Vec<PgnFi
 #[tauri::command]
 pub async fn scan_pgn_files(app: tauri::AppHandle) -> Vec<PgnFile> {
     let resolver = app.path();
-    let roots: Vec<PathBuf> = [
-        resolver.download_dir().ok(),
-        resolver.document_dir().ok(),
-        resolver.desktop_dir().ok(),
-        resolver.home_dir().ok(),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
+    let mut roots: Vec<PathBuf> = Vec::new();
+    roots.extend(resolver.download_dir().ok());
+    roots.extend(resolver.document_dir().ok());
+
+    // Android and iOS have no desktop, and Tauri does not define
+    // `desktop_dir` for them at all — calling it there is a compile
+    // error, not an empty result.
+    //
+    // Worth knowing about the mobile case generally: under scoped storage
+    // these resolve to the app's own external-files directories rather
+    // than the shared Downloads folder a browser would save into, so this
+    // scan finds only what the app itself put there. Reaching a user's
+    // real downloads needs the system document picker, which is a
+    // different mechanism than walking a directory.
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    roots.extend(resolver.desktop_dir().ok());
+
+    roots.extend(resolver.home_dir().ok());
 
     let mut seen_roots = HashSet::new();
     let mut results: Vec<PgnFile> = Vec::new();

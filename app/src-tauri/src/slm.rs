@@ -192,7 +192,7 @@ pub fn init(app: &tauri::AppHandle) -> Result<SlmHandle, String> {
     let model_path = resolve_model_path(app);
     if !model_path.exists() {
         return Err(format!(
-            "SLM model not found at {} — see app/src-tauri/models/README.md",
+            "SLM model not found at {}. See app/src-tauri/models/README.md",
             model_path.display()
         ));
     }

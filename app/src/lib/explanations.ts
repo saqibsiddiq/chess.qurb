@@ -545,6 +545,50 @@ export function detectMissedTactic(
   return null;
 }
 
+/**
+ * What the side to move is threatening in a position.
+ *
+ * Explanations otherwise only describe what the player's own move did.
+ * Just as instructive is what is now coming *at* them — and the detectors
+ * already take a colour, so this is the same machinery pointed the other
+ * way rather than a second implementation.
+ */
+export function describeThreat(fenAfter: string): string | null {
+  let board: Chess;
+  try {
+    board = new Chess(fenAfter);
+  } catch {
+    return null;
+  }
+
+  // Whoever is to move is the one with the threat.
+  const attacker = board.turn();
+  const defender: Color = attacker === 'w' ? 'b' : 'w';
+
+  // A piece the defender has left hanging is the most concrete threat
+  // there is: it can simply be taken.
+  const loose = board
+    .board()
+    .flat()
+    .filter((sq): sq is NonNullable<typeof sq> => sq !== null)
+    .filter((sq) => sq.color === defender && sq.type !== 'k')
+    .find(
+      (sq) =>
+        board.attackers(sq.square, attacker).length > 0 &&
+        board.attackers(sq.square, defender).length === 0,
+    );
+  if (loose) {
+    return `Your ${PIECE_NAMES[loose.type]} on ${loose.square} is undefended and can be taken.`;
+  }
+
+  const backRank = detectBackRank(board, defender);
+  if (backRank) {
+    return `Your king on ${backRank.kingSquare} is short of escape squares, so watch the back rank.`;
+  }
+
+  return null;
+}
+
 export function explainMove(
   move: ParsedMove,
   beforeFen: string,
@@ -568,6 +612,15 @@ export function explainMove(
   // essentially the same square), which is what actually made arrows
   // look cluttered/confusing rather than any square being invalid.
   const bestMoveArrow: BoardShape[] = bestMove ? [{ orig: bestMove.from, dest: bestMove.to, brush: 'green' }] : [];
+
+  /** The move actually played, drawn only where it differs from the best
+   *  one. Two arrows in different colours answer "what did I do" and
+   *  "what should I have done" at a glance, which one arrow cannot. */
+  const playedArrow: BoardShape[] = (() => {
+    if (move.uci === analysisBefore.bestMove) return [];
+    const played = moveFromUci(move.uci);
+    return played ? [{ orig: played.from, dest: played.to, brush: 'blue' as const }] : [];
+  })();
 
   // 1. Immediate Checkmate Played
   if (afterBoard.isCheckmate()) {
@@ -675,10 +728,13 @@ export function explainMove(
       detail: missedTactic.detail,
       motif: missedTactic.motif,
       motifDetail: missedTactic.motifDetail,
-      // The tactic's own arrows already originate from the best move's
-      // destination square, so a separate green arrow here would just
-      // be a redundant line to (near) the same place.
-      shapes: missedTactic.shapes,
+      // The green arrow is not redundant here, which an earlier pass
+      // assumed when it removed it. The tactic's yellow arrows fan out
+      // from `bestMove.to` — a square that is *empty in the position on
+      // screen*, because the best move has not been played. Drawing the
+      // move that gets a piece there is what makes the rest legible:
+      // green says "play this", yellow says "and it hits these".
+      shapes: [...bestMoveArrow, ...missedTactic.shapes],
     };
   }
 
@@ -787,6 +843,6 @@ export function explainMove(
     }),
     detail: pickVariant(moveSeed(move, 'fallback:detail'), fallbackDetails)({ bestSan, lossText }),
     motif: 'evaluation',
-    shapes: bestMoveArrow,
+    shapes: [...playedArrow, ...bestMoveArrow],
   };
 }

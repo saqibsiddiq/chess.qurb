@@ -60,3 +60,13 @@ data/experiments/generated/
 
 # Local Python environments
 dataset/venv/
+
+# Stockfish's Android cross-compile scratch: an unpacked source tree plus
+# the NNUE nets, ~220MB. Recreated by scripts/build-stockfish-android.sh.
+.stockfish-android/
+
+# Android signing. The keystore and its passwords must never be
+# committed: whoever holds them can publish updates as this app.
+app/src-tauri/keystore.properties
+*.jks
+*.keystore

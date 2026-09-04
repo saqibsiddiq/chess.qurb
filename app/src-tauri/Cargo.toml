@@ -49,3 +49,19 @@ llama-cpp-2 = "0.1.155"
 regex = "1.13.1"
 encoding_rs = "0.8.35"
 
+# Already in the tree via Tauri; declared here so the asset downloader can
+# use them directly, pinned to the versions already locked so nothing new
+# is pulled in.
+# `rustls` rather than the system TLS stack: Android's NDK build has no
+# OpenSSL to link against, and bundling one for a handful of downloads
+# is not worth it.
+reqwest = { version = "0.13.4", default-features = false, features = ["stream", "rustls", "http2", "json"] }
+# TLS trust roots compiled in rather than read from the platform; see
+# the `https` client in src/assets.rs for why.
+rustls = { version = "0.23.43", default-features = false, features = ["aws-lc-rs", "std", "tls12"] }
+webpki-roots = "1"
+futures-util = "0.3.34"
+sha2 = "0.10.9"
+hex = "0.4.3"
+tokio = { version = "1.53.1", features = ["fs", "io-util"] }
+
