@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "resources": {
+      "binaries/stockfish.exe": "binaries/stockfish.exe",
+      "models/chesy-slm-v1-q4_k_m.gguf": "models/chesy-slm-v1-q4_k_m.gguf"
+    }
+  }
+}

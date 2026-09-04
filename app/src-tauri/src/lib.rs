@@ -77,7 +77,12 @@ fn resolve_engine_path(app: &tauri::AppHandle, engine_path: Option<String>) -> S
         return path;
     }
 
-    match app.path().resolve("binaries/stockfish", BaseDirectory::Resource) {
+    let bundled = if cfg!(windows) {
+        "binaries/stockfish.exe"
+    } else {
+        "binaries/stockfish"
+    };
+    match app.path().resolve(bundled, BaseDirectory::Resource) {
         Ok(resolved) if resolved.exists() => resolved.to_string_lossy().into_owned(),
         _ => "stockfish".to_string(),
     }
