@@ -90,7 +90,28 @@ PY
 fi
 
 if [ -f "$props" ]; then
-  echo "keystore.properties found — release builds will be signed."
+  # Validate before building. Java property keys are case-sensitive, so a
+  # file that says "storeFIle" or "storepassword" parses cleanly and
+  # yields nothing: Gradle then finds no key, skips signing, and emits an
+  # unsigned APK with a successful exit code. That failure is silent and
+  # easy to mistake for success, so it is caught here instead.
+  missing=""
+  for key in storeFile storePassword keyAlias keyPassword; do
+    grep -q "^${key}=" "$props" || missing="$missing $key"
+  done
+  if [ -n "$missing" ]; then
+    echo "ERROR: keystore.properties is missing these keys (exact spelling matters):$missing" >&2
+    echo "  found:" >&2
+    sed "s/=.*/=<value>/" "$props" | sed "s/^/    /" >&2
+    exit 1
+  fi
+  store=$(grep "^storeFile=" "$props" | cut -d= -f2- | tr -d "\r" | sed "s/[[:space:]]*$//")
+  if [ ! -f "$store" ]; then
+    echo "ERROR: storeFile does not exist: $store" >&2
+    echo "Use an absolute path to the .jks file." >&2
+    exit 1
+  fi
+  echo "keystore.properties valid; storeFile resolves. Release builds will be signed."
 else
   cat <<'MSG'
 
